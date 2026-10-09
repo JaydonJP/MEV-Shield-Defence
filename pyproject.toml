@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mevshield"
+version = "1.0.0"
+description = "MEV Shield — predict and prevent flash-loan and MEV attacks on a local Ethereum devnet"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "web3>=7,<8",
+  "typer>=0.12",
+  "rich>=13",
+  "scikit-learn>=1.4",
+  "pandas>=2.1",
+  "numpy>=1.26",
+  "streamlit>=1.35",
+  "plotly>=5.20",
+  "requests>=2.31",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+mevshield = "mevshield.cli:app"
+
+[tool.setuptools]
+packages = ["mevshield", "mevshield.harness"]

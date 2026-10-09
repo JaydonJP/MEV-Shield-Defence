@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.egg-info/
+*.pyc
+data/*.db
+data/*.log
+data/devnet.json
+data/deployments.json
+data/model.pkl
+data/results.csv
+data/shadow.lock
+data/st*.log
+contracts/out/
+contracts/cache/
+contracts/broadcast/
