@@ -20,6 +20,7 @@ from web3 import Web3
 from . import config, store
 from .builder import Searcher
 from .chain import Chain, role_of
+from .responder import Responder
 from .shadow import ShadowFork, pending_to_simtx
 
 FLASH_TOPIC = Web3.keccak(text="FlashLoan(address,address,address,uint256,uint256)").to_0x_hex()
@@ -69,7 +70,7 @@ class Guardian(Searcher):
         self.log = log or (lambda *a, **k: None)
         self.seen: set[str] = set()
         self.verdicts: list[Verdict] = []
-        self.responder = Responder(chain) if respond else None
+        self.responder = Responder(chain, log=self.log) if respond else None
 
     # ------------------------------------------------------- replay + features
     def analyze(self, tx: dict) -> Verdict:
@@ -204,8 +205,11 @@ class Guardian(Searcher):
             self.verdicts.append(v)
             action = ""
             if v.label == "CRITICAL" and self.respond and v.target:
-                action = self.responder.pause(v.target, tx)
-                responded += 1 if action else 0
+                attack_tip = int(tx.get("maxPriorityFeePerGas", "0x0"), 16)
+                h = self.responder.pause(v.target, attack_tip)
+                if h:
+                    action = f"pause({v.target}) sent (ordered before the attack)"
+                    responded += 1
             store.add_alert(v.tx_hash, v.sender, v.label, v.severity, v.score, _feat_dict(v.features),
                             action=action, latency_ms=v.latency_ms, block=chain.block_number)
             store.mark_seen([h])
@@ -240,22 +244,3 @@ def detect_sandwich(chain: Chain, pending: list[dict]) -> set[str]:
                     flagged.add(tx["hash"].lower())
     return flagged
 
-
-class Responder:
-    """Circuit breaker: send pause() with a higher priority fee so it is ordered before the attack."""
-
-    name = "responder"
-
-    def __init__(self, chain: Chain):
-        from .chain import account
-        self.chain = chain
-        self.acct = account("guardian")
-
-    def pause(self, market: str, attack_tx: dict) -> str:
-        attack_tip = int(attack_tx.get("maxPriorityFeePerGas", "0x0"), 16)
-        tip = attack_tip + 5 * config.GWEI  # outbid the attacker → ordered first in the block
-        m = self.chain.c(market)
-        if m.functions.paused().call():
-            return f"{market} already paused"
-        h = self.chain.send(self.acct, m.functions.pause(), tip=tip, gas=120_000)
-        return f"pause({market}) sent at {tip / config.GWEI:.0f} gwei tip (ordered before the attack)"
