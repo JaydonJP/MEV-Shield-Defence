@@ -14,8 +14,8 @@ from dataclasses import dataclass, field
 
 from web3 import Web3
 
-from . import config
-from .chain import Chain
+from .. import config
+from .connection import Chain
 
 _LOCK_FILE = config.DATA_DIR / "shadow.lock"
 _thread_lock = threading.RLock()

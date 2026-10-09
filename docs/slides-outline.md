@@ -9,7 +9,7 @@
 4. **Threat model** — T1 sandwich (user), T2 flash-loan oracle manipulation (protocol), T3 arbitrage
    (benign — false-positive test), T4 governance (stretch).
 5. **Architecture** — diagram (`docs/architecture.md`): main devnet (`--no-mining --order fees`) + shadow
-   fork; attacker bots; Risk Engine + Defense Selector; Guardian + Responder; SQLite → dashboard.
+   fork; attacker bots; Risk Engine + Defense Selector; Guardian + Responder; SQLite → web dashboard.
 6. **Predict, user side** — rational-attacker search for the worst sandwich on the shadow fork; harm =
    `out_benign − out_attacked`; closed-form cross-check (error ≈ 0.02 %). *Live:* `mevshield predict 500`.
 7. **Prevent, user side** — selector `J = harm + λ·gas + λ·latency + λ·revert`; adaptive slippage `s*`.
@@ -19,7 +19,7 @@
 9. **Prevent, protocol side** — Responder `pause()` ordered before the attack (higher tip) → revert;
    SafeLending immune by design. *Live:* attack vulnerable (drained) → guardian start → attack (blocked) →
    attack safe (fails).
-10. **Fast predictor + dashboard** — ML harm model < 1 ms, R² ≈ 0.99; Streamlit live mempool labels.
+10. **ML risk model + web dashboard** — gradient-boosted model, R² ≈ 0.99, ROC-AUC ≈ 0.999; realtime web UI (FastAPI + WebSocket) live mempool labels.
 11. **Evidence** — `mevshield benchmark`: detection P/R/FPR = 1.0/1.0/0.0, 0 arb false positives;
     harm no-protection vs public vs adaptive (~100 % reduction); regret vs baselines.
 12. **Limitations & takeaways** — local devnet, single builder, rational-attacker assumption, simplified

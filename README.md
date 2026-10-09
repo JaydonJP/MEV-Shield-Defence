@@ -44,6 +44,7 @@ py -V:Astral/CPython3.12.13 -m venv .venv      # or: python3.12 -m venv .venv
 
 # 3. (optional) run the test suites
 cd contracts && forge test && cd ..            # 22 Solidity tests
+.venv\Scripts\pip install pytest
 .venv\Scripts\python -m pytest tests -q        # 12 Python tests
 ```
 
@@ -52,37 +53,50 @@ All `mevshield …` commands below assume the venv is active (`.venv\Scripts\act
 
 ---
 
-## Demo — the 10-minute command chain
+## The live web demo — one command
 
 ```bash
-mevshield up                                 # start devnet + shadow fork, deploy & seed everything
+mevshield start
+```
 
-# Act 1 — flash loans are powerful (benign)
-mevshield arb                                # attacker balance 0 → flash loan → profit; Guardian: BENIGN
+`start` boots the chain + shadow fork, deploys and seeds everything, trains the ML model if needed, then
+opens the **web dashboard** (`http://127.0.0.1:8000`). From that single page you drive the whole system and
+watch it react in real time:
 
-# Act 2 — sandwich: predict & prevent (user side)
-mevshield swap 500 --public                  # sandwich bot strikes; block shows [front, victim, back]; loss shown
-mevshield predict 500                        # BEFORE sending: predicted loss, attacker profit, harm per defense
-mevshield swap 500 --protect                 # selector picks a defense → attack unprofitable → loss ≈ 0
-mevshield predict 5                           # tiny swap → "public is fine" (no over-protection)
+- **Swap, unprotected** — the sandwich bot front-runs; the block renders live as `[frontrun, victim, backrun]`
+  and the victim's loss is shown.
+- **Predict** — the counterfactual Risk Engine forecasts the harm and the defense selector ranks every
+  option (`J = harm + gas + latency + revert-risk`) before anything is sent.
+- **Swap, protected** — the selector's choice is applied; the attack becomes unprofitable, loss ≈ 0.
+- **Oracle attack** — drains `VulnerableLending`.
+- **Oracle attack · Guardian on** — the Guardian detects it (CRITICAL) and its `pause()` is ordered one slot
+  **before** the attack, which reverts; funds intact.
+- **Oracle attack · SafeLending** — fails by design (TWAP + deviation guard).
+- **Arbitrage** — a flash loan with profit but no protocol loss → correctly ruled **benign** (no false positive).
 
-# Act 3 — flash-loan oracle attack: predict & prevent (protocol side)
-mevshield attack oracle --target vulnerable  # protocol drained, bad debt shown
-mevshield reset
+The event stream, block builder, Guardian alerts, live telemetry and the trained-model panel all update over
+a WebSocket as each scenario runs.
+
+---
+
+## CLI — individual commands
+
+```bash
+mevshield up                                 # start devnet + shadow fork, deploy & seed
+mevshield serve                              # just launch the web dashboard (devnet must be up)
+
+mevshield arb                                # benign flash-loan arbitrage; Guardian: BENIGN
+mevshield swap 500 --public                  # sandwich bot strikes; [front, victim, back]; loss shown
+mevshield predict 500                        # predicted loss, attacker profit, harm per defense
+mevshield swap 500 --protect                 # selector picks a defense → loss ≈ 0
+mevshield attack oracle --target vulnerable  # protocol drained
 mevshield guardian start                     # (2nd terminal) live mempool monitor, auto-pause on CRITICAL
-mevshield attack oracle --target vulnerable  # Guardian: CRITICAL → pause() ordered first → attack reverts
-mevshield attack oracle --target safe        # TWAP lending: attack unprofitable by design
+mevshield attack oracle --target safe        # TWAP lending: unprofitable by design
+mevshield attack governance --target safe    # snapshot voting defeats the flash-loan DAO takeover
 
-# Act 3b (stretch) — governance
-mevshield attack governance --target vulnerable   # DAO treasury drained
-mevshield attack governance --target safe         # snapshot voting defeats it
-
-# Act 4 — evidence
-mevshield train                              # train the ML fast predictor; prints MAE / R² / latency
-mevshield benchmark                          # mixed workload: detection P/R/FPR, harm with vs without shield, regret
-mevshield dashboard                          # live mempool w/ risk labels, block ordering, alerts, charts
-
-mevshield demo                               # runs Acts 1–3 automatically with "press Enter" pauses (backup)
+mevshield train                              # train the ML risk model; prints R² / CV / ROC-AUC / importances
+mevshield benchmark                          # mixed workload: detection P/R/FPR, harm with vs without shield
+mevshield demo                               # scripted terminal demo (backup for the live web demo)
 mevshield down                               # stop the devnet
 ```
 
@@ -95,7 +109,7 @@ mevshield down                               # stop the devnet
                   │  counterfactual sims                  (test harness)     detect T1/T2  pause() w/ higher tip
                   └──────────────► Shadow fork (anvil --fork) ◄── replay pending tx
                                    snapshot / revert
-  main devnet: anvil --no-mining --order fees   ·   all events ─► SQLite ─► Streamlit dashboard
+  main devnet: anvil --no-mining --order fees   ·   all events ─► SQLite + WebSocket ─► web dashboard
 ```
 
 - **Predict (user side)** — `risk.py` runs the swap alone, then a profit-maximising rational attacker
@@ -113,7 +127,7 @@ mevshield down                               # stop the devnet
   before the attack in the same block (Forta / Hypernative-style pre-execution defense). `SafeLending`
   additionally resists manipulation by design (TWAP + deviation guard).
 - **Fast predictor** — `predictor.py` trains a gradient-boosting model on a few thousand simulated
-  scenarios, predicting harm in < 1 ms for the dashboard's live mempool labels (the simulator stays the
+  scenarios, predicting harm in a few milliseconds for the dashboard's live mempool labels (the simulator stays the
   source of truth for decisions).
 
 ---
@@ -121,17 +135,41 @@ mevshield down                               # stop the devnet
 ## Repository layout
 
 ```
-contracts/          Foundry project (Solidity 0.8.24) + forge tests
-  src/              Token, SimpleAMM, FlashLender, TWAPOracle, Vulnerable/SafeLending,
-                    ProtectedRouter, CommitRevealSwap, Governance, harness/ (attackers)
-  test/             22 unit + scenario tests
-mevshield/          Python package (web3.py, typer, scikit-learn, streamlit)
-  config · devnet · chain · deploy · shadow · builder · amm_math · risk · predictor ·
-  defense · relay · guardian · benchmark · store · cli · demo · harness/
-dashboard/app.py    Streamlit dashboard
-tests/              Python unit tests
-data/               deployments.json, results.csv, model.pkl, mevshield.db (generated)
-docs/               report, architecture diagram
+contracts/              Foundry project (Solidity 0.8.24) + 22 forge tests
+  src/                  Token, SimpleAMM, FlashLender, TWAPOracle, Vulnerable/SafeLending,
+                        ProtectedRouter, CommitRevealSwap, Governance, harness/ (attackers)
+
+mevshield/              Python package, grouped by responsibility
+  config.py             world parameters, ports, accounts
+  cli.py                the `mevshield` command
+  demo.py               scripted terminal demo
+  store.py              SQLite (alerts, predictions, blocks, experiments)
+  benchmark.py          mixed-workload evaluation → data/results.csv
+  chain/                blockchain layer
+    connection.py         web3 wrapper, accounts, signing, snapshots
+    devnet.py             start/stop anvil main + shadow fork
+    deploy.py             deploy & seed the world
+    shadow.py             shadow fork — counterfactual bundle simulation
+    builder.py            block builder (searcher window, relay injection, fee ordering)
+  defense/              user-side predict & prevent
+    amm_math.py           exact AMM + closed-form sandwich/oracle/arbitrage math
+    risk.py               counterfactual Risk Engine
+    selector.py           defenses + the J(d) selector
+    relay.py              private relay
+    predictor.py          ML risk model (gradient-boosted; train/load/predict)
+  guardian/             protocol-side predict & prevent
+    monitor.py            mempool monitor, feature extraction, explainable scoring
+    responder.py          circuit-breaker (pause ordered before the attack)
+  harness/              test-harness attackers + benign traffic
+    attacks.py · sandwich_bot.py · traffic.py
+  web/                  the live web dashboard
+    server.py             FastAPI + WebSocket backend
+    engine.py             drives the devnet and emits realtime events
+    static/               index.html · styles.css · app.js  (no framework)
+
+tests/                  Python unit tests (12)
+data/                   deployments.json, results.csv, model.pkl, mevshield.db (generated)
+docs/                   report, architecture diagram, slides outline
 ```
 
 ---

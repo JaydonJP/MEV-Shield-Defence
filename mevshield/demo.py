@@ -4,7 +4,8 @@ from __future__ import annotations
 from rich.console import Console
 from rich.rule import Rule
 
-from . import config, deploy
+from . import config
+from .chain import deploy
 from .chain import Chain, fmt
 
 
@@ -21,9 +22,9 @@ def run_demo(console: Console, pause: bool = True) -> None:
     from .guardian import Guardian
     from .harness.attacks import submit_arbitrage, submit_oracle_attack
     from .harness.sandwich_bot import SandwichBot
-    from .risk import RiskEngine, SwapIntent
-    from .shadow import ShadowFork
-    from .builder import BlockBuilder
+    from .defense import RiskEngine, SwapIntent
+    from .chain import ShadowFork
+    from .chain import BlockBuilder
     from .cli import _print_block
 
     chain = Chain()

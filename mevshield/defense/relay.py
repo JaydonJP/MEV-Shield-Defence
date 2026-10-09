@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from web3 import Web3
 
-from . import store
-from .chain import Acct, Chain
+from .. import store
+from ..chain import Acct, Chain
 
 
 class PrivateRelay:

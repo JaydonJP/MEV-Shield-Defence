@@ -16,9 +16,10 @@ import random
 import time
 from dataclasses import asdict, dataclass, field
 
-from . import amm_math, config
-from .chain import Chain, account
-from .shadow import ShadowFork, fn_simtx
+from .. import config
+from . import amm_math
+from ..chain import Chain, account
+from ..chain import ShadowFork, fn_simtx
 
 
 @dataclass

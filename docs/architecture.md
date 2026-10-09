@@ -19,7 +19,7 @@
                  │  counterfactual sims            │ Shadow fork (anvil --fork) │
                  └────────────────────────────────►│  cross-process file lock   │
                                                    └────────────────────────────┘
-                                 all events ──► SQLite (store.py) ──► Streamlit dashboard
+                                 all events ──► SQLite (store.py) + WebSocket ──► web dashboard (FastAPI)
 ```
 
 ## Components (file → role)

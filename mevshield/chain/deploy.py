@@ -7,8 +7,8 @@ import time
 
 from web3 import Web3
 
-from . import config
-from .chain import Chain, account, artifact
+from .. import config
+from .connection import Chain, account, artifact
 
 MAX = 2**256 - 1
 

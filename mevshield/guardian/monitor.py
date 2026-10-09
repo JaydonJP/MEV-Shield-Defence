@@ -17,11 +17,11 @@ from dataclasses import dataclass, field
 
 from web3 import Web3
 
-from . import config, store
-from .builder import Searcher
-from .chain import Chain, role_of
+from .. import config, store
+from ..chain import Searcher
+from ..chain import Chain, role_of
 from .responder import Responder
-from .shadow import ShadowFork, pending_to_simtx
+from ..chain import ShadowFork, pending_to_simtx
 
 FLASH_TOPIC = Web3.keccak(text="FlashLoan(address,address,address,uint256,uint256)").to_0x_hex()
 SYNC_TOPIC = Web3.keccak(text="Sync(uint256,uint256)").to_0x_hex()
@@ -228,7 +228,7 @@ def _feat_dict(f: Features) -> dict:
 
 def detect_sandwich(chain: Chain, pending: list[dict]) -> set[str]:
     """Two txs from the same sender, same pool, opposite directions, bracketing by tip → both flagged."""
-    from .harness.sandwich_bot import decode_swap
+    from ..harness.sandwich_bot import decode_swap
     by_sender: dict[str, list] = {}
     for tx in pending:
         sw = decode_swap(chain, tx)

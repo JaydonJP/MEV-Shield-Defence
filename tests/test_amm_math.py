@@ -1,7 +1,8 @@
 """Unit tests for the closed-form AMM / sandwich math (no devnet needed)."""
 import math
 
-from mevshield import amm_math, config
+from mevshield import config
+from mevshield.defense import amm_math
 
 E = config.E
 
@@ -72,6 +73,6 @@ def test_arbitrage_profit_between_dislocated_pools():
 
 
 def test_revert_probability_monotone():
-    from mevshield.risk import revert_probability
+    from mevshield.defense import revert_probability
     assert revert_probability(0.0001) > revert_probability(0.02)
     assert 0 <= revert_probability(0.02) <= 1

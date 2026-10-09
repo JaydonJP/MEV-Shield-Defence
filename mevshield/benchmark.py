@@ -16,17 +16,16 @@ from dataclasses import asdict
 
 import pandas as pd
 
-from . import config, deploy, store
-from .chain import Chain
+from . import config, store
+from .chain import deploy
+from .chain import Chain, ShadowFork, BlockBuilder
 from .defense import DEFENSES, DefenseSelector, execute
 from .guardian import Guardian
 from .harness.attacks import submit_arbitrage, submit_oracle_attack
 from .harness.sandwich_bot import SandwichBot
 from .harness.traffic import benign_mix, submit_user_swap
-from .builder import BlockBuilder
-from .predictor import HarmPredictor
-from .risk import RiskEngine, SwapIntent
-from .shadow import ShadowFork
+from .defense import HarmPredictor
+from .defense import RiskEngine, SwapIntent
 
 TRADE_SIZES = [5, 25, 100, 250, 500, 1000, 2500, 5000, 10000, 20000]
 
@@ -180,7 +179,7 @@ def predictor_eval(chain: Chain, shadow: ShadowFork, n: int = 40, seed: int = 2,
     metrics = {"mae": round(float(mae), 3), "r2": round(float(r2), 4),
                "mean_sim_ms": round(float(df["sim_ms"].mean()), 1), "mean_ml_us": round(float(df["ml_us"].mean()), 1),
                "speedup": round(float(df["sim_ms"].mean() * 1000 / df["ml_us"].mean()), 0), "n": n}
-    store.save_experiment("predictor_eval", {"metrics": metrics, "model_metrics": asdict(model.metrics),
+    store.save_experiment("predictor_eval", {"metrics": metrics, "model_metrics": model.metrics_dict(),
                                              "samples": df.to_dict("records")})
     log(f"  MAE=${metrics['mae']} R2={metrics['r2']} sim={metrics['mean_sim_ms']}ms ml={metrics['mean_ml_us']}us "
         f"(~{metrics['speedup']:.0f}× faster)")

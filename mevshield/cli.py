@@ -22,7 +22,8 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from . import config, deploy, devnet, store
+from . import config, store
+from .chain import deploy, devnet
 from .chain import Chain, fmt
 
 app = typer.Typer(add_completion=False, help="MEV Shield — predict & prevent flash-loan and MEV attacks.",
@@ -49,7 +50,7 @@ def _chain() -> Chain:
 
 
 def _shadow():
-    from .shadow import ShadowFork, shadow_available
+    from .chain import ShadowFork, shadow_available
     if not shadow_available():
         console.print("[red]shadow fork is not running — run `mevshield up`[/red]")
         raise typer.Exit(1)
@@ -57,7 +58,7 @@ def _shadow():
 
 
 def _builder(chain, searchers, log=None):
-    from .builder import BlockBuilder
+    from .chain import BlockBuilder
     return BlockBuilder(chain, searchers, log=log or console.print)
 
 
@@ -164,7 +165,7 @@ def swap(amount: float, public: bool = typer.Option(False, "--public"),
          slippage: float = typer.Option(config.DEFAULT_SLIPPAGE), token_in: str = "USDC"):
     """Act 2 — send a swap. --public (exposed), --protect (selector picks a defense), or just quote."""
     from .defense import DefenseSelector, execute
-    from .risk import RiskEngine, SwapIntent
+    from .defense import RiskEngine, SwapIntent
     chain = _chain()
     shadow = _shadow()
     intent = SwapIntent(amount, token_in=token_in, slippage=slippage)
@@ -202,7 +203,7 @@ def swap(amount: float, public: bool = typer.Option(False, "--public"),
 def predict(amount: float, slippage: float = typer.Option(config.DEFAULT_SLIPPAGE), token_in: str = "USDC"):
     """Act 2 — BEFORE sending: predicted loss, attacker profit, harm per defense, recommendation."""
     from .defense import DefenseSelector
-    from .risk import RiskEngine, SwapIntent
+    from .defense import RiskEngine, SwapIntent
     chain = _chain()
     shadow = _shadow()
     intent = SwapIntent(amount, token_in=token_in, slippage=slippage)
@@ -315,22 +316,24 @@ def guardian_start(respond: bool = typer.Option(True, help="auto-pause on CRITIC
 
 # ------------------------------------------------------------- train/benchmark
 @app.command()
-def train(samples: int = 4000):
-    """Train the ML fast predictor on simulated scenarios and report its accuracy."""
-    from .predictor import HarmPredictor
-    console.print(f"generating {samples} scenarios and training…")
+def train(samples: int = 20000):
+    """Train the ML risk predictor on synthesised attack scenarios and report its accuracy."""
+    from .defense import HarmPredictor
+    console.print(f"synthesising {samples:,} attack scenarios and training gradient-boosted models…")
     m = HarmPredictor()
-    metrics = m.train(samples)
+    metrics = m.train(samples, log=console.print)
     m.save()
-    t = Table(title="ML harm predictor vs simulator")
+    t = Table(title="ML risk predictor")
     t.add_column("metric"); t.add_column("value", justify="right")
-    t.add_row("MAE (USD)", f"{metrics.mae:.3f}")
-    t.add_row("R²", f"{metrics.r2:.4f}")
-    t.add_row("classifier precision", f"{metrics.classifier_precision:.3f}")
-    t.add_row("classifier recall", f"{metrics.classifier_recall:.3f}")
-    t.add_row("train time", f"{metrics.train_ms:.0f} ms")
+    t.add_row("harm R²", f"{metrics.r2:.4f}")
+    t.add_row("harm R² (5-fold CV)", f"{metrics.cv_r2_mean:.4f} ± {metrics.cv_r2_std:.4f}")
+    t.add_row("harm MAE / RMSE", f"${metrics.mae:.2f} / ${metrics.rmse:.2f}")
+    t.add_row("attack classifier F1", f"{metrics.classifier_f1:.3f}")
+    t.add_row("attack ROC-AUC", f"{metrics.roc_auc:.4f}")
     t.add_row("predict latency", f"{metrics.predict_us:.0f} µs")
     console.print(t)
+    top = list(metrics.feature_importances.items())[:4]
+    console.print("top features: " + ", ".join(f"{k} ({v:.2f})" for k, v in top))
     console.print(f"[green]saved to {config.MODEL_FILE}[/green]")
 
 
@@ -356,21 +359,59 @@ def benchmark(quick: bool = typer.Option(False, help="fewer trade sizes / sample
     p = summary["predictor"]
     t.add_row("predictor MAE / R²", f"${p['mae']} / {p['r2']}")
     console.print(t)
-    console.print(f"[green]wrote {config.RESULTS_CSV}[/green]  →  view with [bold]mevshield dashboard[/bold]")
+    console.print(f"[green]wrote {config.RESULTS_CSV}[/green]  →  view with [bold]mevshield serve[/bold]")
+
+
+def _ensure_up(build: bool = False) -> None:
+    """Start the devnet + shadow fork and deploy if they are not already running."""
+    s = devnet.status()
+    if not s["main"]["alive"]:
+        if build:
+            console.print("Building contracts…")
+            deploy.forge_build()
+        console.print("Starting main devnet…")
+        devnet.start_main()
+        deploy.deploy_all(Chain(), log=console.print)
+    if not devnet.status()["shadow"]["alive"]:
+        console.print("Starting shadow fork…")
+        devnet.start_shadow()
+    store.clear_runtime()
+
+
+def _ensure_model() -> None:
+    from .defense import HarmPredictor
+    if not HarmPredictor.available():
+        console.print("No trained model found — training one now (this runs once)…")
+        m = HarmPredictor(); m.train(log=console.print); m.save()
+        console.print("[green]model trained[/green]")
 
 
 @app.command()
-def dashboard():
-    """Launch the Streamlit dashboard."""
-    import subprocess
-    app_path = config.ROOT / "dashboard" / "app.py"
-    console.print(f"launching Streamlit… ({app_path})")
-    subprocess.run([sys.executable, "-m", "streamlit", "run", str(app_path)])
+def serve(host: str = "127.0.0.1", port: int = 8000, open_browser: bool = True):
+    """Launch the web dashboard (FastAPI). The devnet and model must be up (`mevshield start` does it all)."""
+    import uvicorn
+    if not devnet.status()["main"]["alive"]:
+        console.print("[yellow]devnet is not running — start it with `mevshield up` (or use `mevshield start`).[/yellow]")
+    url = f"http://{host}:{port}"
+    console.print(Panel.fit(f"MEV Shield dashboard → [bold]{url}[/bold]\nCtrl-C to stop", title="serve"))
+    if open_browser:
+        import threading, webbrowser
+        threading.Timer(1.2, lambda: webbrowser.open(url)).start()
+    uvicorn.run("mevshield.web.server:app", host=host, port=port, log_level="warning")
+
+
+@app.command()
+def start(port: int = 8000, build: bool = typer.Option(False, help="run `forge build` first")):
+    """One command: boot the chain + shadow fork, deploy, train the model if needed, and open the dashboard."""
+    _ensure_up(build=build)
+    _ensure_model()
+    console.print(Panel.fit("Everything is up. Opening the live dashboard…", title="MEV Shield"))
+    serve(port=port, open_browser=True)
 
 
 @app.command()
 def demo(pause: bool = typer.Option(True, help="press Enter between acts")):
-    """Run Acts 1–4 automatically (backup for the live demo)."""
+    """Run the scripted demo in the terminal (backup for the live web demo)."""
     from .demo import run_demo
     run_demo(console, pause=pause)
 

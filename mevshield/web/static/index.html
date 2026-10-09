@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MEV Shield</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+<div id="offline" class="offline hidden">
+  <div class="offline-card">
+    <h2>Devnet not connected</h2>
+    <p>The chain, shadow fork or model is not running. Start everything with:</p>
+    <pre>mevshield start</pre>
+    <p class="muted">This page connects automatically once the system is up.</p>
+  </div>
+</div>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="mark">MEV&nbsp;SHIELD</span>
+    <span class="tagline">Predict &amp; prevent flash-loan and MEV attacks</span>
+  </div>
+  <div class="status-pills" id="status-pills">
+    <div class="pill" data-k="main"><span class="dot"></span>Chain</div>
+    <div class="pill" data-k="shadow"><span class="dot"></span>Shadow fork</div>
+    <div class="pill" data-k="model"><span class="dot"></span>Model</div>
+    <div class="pill pill-num" id="pill-block"><span class="k">block</span><span class="v" id="v-block">—</span></div>
+  </div>
+</header>
+
+<section class="controls">
+  <div class="control-group">
+    <span class="group-label">User side — sandwich (T1)</span>
+    <div class="btn-row">
+      <input type="number" id="amount" value="500" min="1" step="50" class="amount" aria-label="Swap size (USDC)" />
+      <button class="btn btn-danger" data-act="sandwich" data-protect="false">Swap, unprotected</button>
+      <button class="btn btn-accent" data-act="predict">Predict</button>
+      <button class="btn btn-success" data-act="sandwich" data-protect="true">Swap, protected</button>
+    </div>
+  </div>
+  <div class="control-group">
+    <span class="group-label">Protocol side</span>
+    <div class="btn-row">
+      <button class="btn btn-danger" data-act="oracle" data-target="vulnerable" data-guard="false">Oracle attack</button>
+      <button class="btn btn-success" data-act="oracle" data-target="vulnerable" data-guard="true">Oracle attack · Guardian on</button>
+      <button class="btn" data-act="oracle" data-target="safe" data-guard="false">Oracle attack · SafeLending</button>
+      <button class="btn" data-act="arbitrage">Arbitrage</button>
+    </div>
+  </div>
+  <div class="control-group control-reset">
+    <button class="btn btn-ghost" data-act="reset">Reset</button>
+  </div>
+</section>
+
+<section class="phases" id="phases" aria-label="Pipeline stage"></section>
+
+<main class="grid">
+  <!-- Event stream -->
+  <section class="panel stream-panel">
+    <div class="panel-head"><h3>Event stream</h3><span class="hint" id="stream-hint">live</span></div>
+    <div class="stream" id="stream"></div>
+  </section>
+
+  <!-- Stage -->
+  <section class="panel stage-panel">
+    <div class="panel-head"><h3>Block builder</h3><span class="hint">ordered by priority fee</span></div>
+    <div id="result-banner" class="result-banner hidden"></div>
+    <div class="mempool" id="mempool-wrap">
+      <div class="sub-label">Pending mempool</div>
+      <div class="mempool-list" id="mempool"></div>
+    </div>
+    <div class="block" id="block-wrap">
+      <div class="sub-label" id="block-label">Current block</div>
+      <div class="block-list" id="block"></div>
+    </div>
+    <div class="prediction hidden" id="prediction">
+      <div class="sub-label">Defense selector — J = harm + gas + latency + revert&nbsp;risk</div>
+      <table class="deftable"><thead><tr>
+        <th>defense</th><th>harm $</th><th>cost $</th><th>latency</th><th>revert</th><th>J $</th>
+      </tr></thead><tbody id="deftable-body"></tbody></table>
+      <div class="pred-meta" id="pred-meta"></div>
+    </div>
+  </section>
+
+  <!-- Telemetry -->
+  <section class="panel tele-panel">
+    <div class="panel-head"><h3>Telemetry</h3></div>
+    <div class="metrics">
+      <div class="metric"><span class="m-label">AMM-A spot</span><span class="m-val" id="m-spot">—</span><span class="m-unit">USDC/WETH</span></div>
+      <div class="metric"><span class="m-label">TWAP</span><span class="m-val" id="m-twap">—</span><span class="m-unit">USDC/WETH</span></div>
+      <div class="metric"><span class="m-label">Vulnerable lending</span><span class="m-val" id="m-vuln">—</span><span class="m-unit">USDC</span></div>
+      <div class="metric"><span class="m-label">Safe lending</span><span class="m-val" id="m-safe">—</span><span class="m-unit">USDC</span></div>
+    </div>
+
+    <div class="alert hidden" id="alert">
+      <div class="alert-head"><span class="alert-label" id="alert-label"></span><span class="alert-by" id="alert-by"></span></div>
+      <ul class="alert-reasons" id="alert-reasons"></ul>
+    </div>
+
+    <div class="model-card" id="model-card">
+      <div class="sub-label">Risk model</div>
+      <div class="model-grid" id="model-grid">
+        <div class="mm"><span>R²</span><b id="mm-r2">—</b></div>
+        <div class="mm"><span>CV R²</span><b id="mm-cv">—</b></div>
+        <div class="mm"><span>MAE</span><b id="mm-mae">—</b></div>
+        <div class="mm"><span>ROC-AUC</span><b id="mm-auc">—</b></div>
+      </div>
+      <div class="imp" id="model-imp"></div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  Isolated local devnet · attacker code is a test harness only · nothing touches mainnet
+</footer>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

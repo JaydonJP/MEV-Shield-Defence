@@ -9,7 +9,7 @@ from eth_account import Account
 from web3 import Web3
 from web3.contract import Contract
 
-from . import config
+from .. import config
 
 # contract name -> forge artifact path (relative to contracts/out)
 ARTIFACTS = {

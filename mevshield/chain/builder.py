@@ -12,8 +12,8 @@ from dataclasses import dataclass, field
 
 from web3 import Web3
 
-from . import store
-from .chain import Chain, role_of
+from .. import store
+from .connection import Chain, role_of
 
 
 class Searcher:

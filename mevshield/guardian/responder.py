@@ -3,8 +3,8 @@ targeted protocol's `pause()` with a HIGHER priority fee than the attack, so the
 the attack reverts (Forta / Hypernative-style pre-execution defense)."""
 from __future__ import annotations
 
-from . import config
-from .chain import Chain, account
+from .. import config
+from ..chain import Chain, account
 
 PAUSABLE = ("vulnerable", "safe", "vulnerableDAO", "snapshotDAO")
 

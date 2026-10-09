@@ -65,7 +65,7 @@ block and the attack reverts. `SafeLending` also resists by design (TWAP oracle 
 ### 2.4 Fast predictor
 
 The shadow-fork simulation costs ~100s of ms. `predictor.py` trains a gradient-boosting model on a few
-thousand simulated scenarios (trade size, liquidity, slippage, fee, gas) to predict harm in < 1 ms, used
+thousand synthesised attack scenarios (trade size, pool depth, price level, slippage, fee, gas) to predict harm in a few ms, used
 for the dashboard's live mempool labels; the simulator remains the source of truth for decisions.
 
 ## 3. Implementation
@@ -73,8 +73,9 @@ for the dashboard's live mempool labels; the simulator remains the source of tru
 Solidity 0.8.24 contracts (Foundry) for an own minimal AMM (`x·y=k`, Uniswap-V2 cumulative price), an
 Aave-style flash lender, a TWAP oracle, spot-priced vs TWAP-priced lending markets, a protected router, a
 commit-reveal swap and two DAOs; plus a test-harness of attacker contracts. The off-chain system is a
-Python 3.12 package using `web3.py`, `typer`/`rich` (CLI), `scikit-learn`, `pandas`, and `streamlit`/
-`plotly`. The main devnet runs `anvil --no-mining --order fees`; a custom block builder gives searchers a
+Python 3.12 package using `web3.py`, `typer`/`rich` (CLI), `scikit-learn`, `pandas`, and a `FastAPI` +
+WebSocket web dashboard (a single vanilla-JS page). The main devnet runs `anvil --no-mining --order fees`;
+a custom block builder gives searchers a
 window, injects relayed transactions and mines, so block ordering by priority fee drives the whole demo.
 SQLite stores alerts, predictions, blocks and experiment results. **22 Forge tests** and **12 Python unit
 tests** pass.
@@ -86,8 +87,10 @@ are from a representative run — rerun to regenerate.)*
 
 **Prediction quality**
 - Risk Engine vs the closed-form sandwich formula: harm error **≈ 0.02 %** (target ≤ 1 %).
-- ML fast predictor vs the simulator: **R² ≈ 0.99**, **MAE ≈ \$3–11**, ~**600–700× faster** (< 1 ms vs
-  ~100s of ms); classifier F1 ≈ 0.999.
+- ML risk model (gradient-boosted, trained on 20k synthesised scenarios with 5-fold CV): harm
+  **R² ≈ 0.99**, cross-validated **R² ≈ 0.98**, **MAE ≈ \$5**; attack classifier **F1 ≈ 0.98**,
+  **ROC-AUC ≈ 0.999**; predicts in a few ms vs the simulator's ~100s of ms (hundreds of × faster). Top
+  features by permutation importance: trade size, trade/liquidity ratio, slippage.
 - Guardian on a mixed workload (benign swaps, borrows, arbitrage, oracle attacks): **precision 1.0,
   recall 1.0, false-positive rate 0.0**, **0 arbitrage false positives**, detection latency ~0.3 s.
 
@@ -119,7 +122,7 @@ are from a representative run — rerun to regenerate.)*
 ```
 mevshield up → arb → swap 500 --public → predict 500 → swap 500 --protect →
 attack oracle --target vulnerable → (guardian start) → attack oracle --target safe →
-train → benchmark → dashboard
+train → benchmark → serve (web dashboard)
 ```
 
 See `README.md` for the full command chain and `docs/architecture.md` for the component map.

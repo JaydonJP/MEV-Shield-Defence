@@ -5,7 +5,8 @@ Guardian and the by-design defenses can be demonstrated and measured.
 """
 from __future__ import annotations
 
-from .. import amm_math, config
+from .. import config
+from ..defense import amm_math
 from ..chain import Chain, account
 
 TARGETS = {"vulnerable": "vulnerable", "safe": "safe"}

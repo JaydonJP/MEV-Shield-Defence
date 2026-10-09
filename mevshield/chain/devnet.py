@@ -14,7 +14,7 @@ import time
 
 import requests
 
-from . import config
+from .. import config
 
 
 def _rpc_alive(url: str) -> bool:

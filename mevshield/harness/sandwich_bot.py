@@ -8,10 +8,11 @@ from __future__ import annotations
 
 from web3 import Web3
 
-from .. import amm_math, config
-from ..builder import Searcher
+from .. import config
+from ..defense import amm_math
+from ..chain import Searcher
 from ..chain import Chain, account
-from ..shadow import ShadowFork, SimTx, fn_simtx, pending_to_simtx
+from ..chain import ShadowFork, SimTx, fn_simtx, pending_to_simtx
 
 
 def decode_swap(chain: Chain, tx: dict) -> dict | None:
