@@ -364,11 +364,11 @@ def benchmark(quick: bool = typer.Option(False, help="fewer trade sizes / sample
 
 def _ensure_up(build: bool = False) -> None:
     """Start the devnet + shadow fork and deploy if they are not already running."""
+    if build:
+        console.print("Building contracts…")
+        deploy.forge_build()
     s = devnet.status()
     if not s["main"]["alive"]:
-        if build:
-            console.print("Building contracts…")
-            deploy.forge_build()
         console.print("Starting main devnet…")
         devnet.start_main()
         deploy.deploy_all(Chain(), log=console.print)
@@ -388,10 +388,10 @@ def _ensure_model() -> None:
 
 @app.command()
 def serve(host: str = "127.0.0.1", port: int = 8000, open_browser: bool = True):
-    """Launch the web dashboard (FastAPI). The devnet and model must be up (`mevshield start` does it all)."""
+    """Launch the website. Sepolia works independently; `mevshield start` also starts the local lab."""
     import uvicorn
     if not devnet.status()["main"]["alive"]:
-        console.print("[yellow]devnet is not running — start it with `mevshield up` (or use `mevshield start`).[/yellow]")
+        console.print("[yellow]Local lab offline; the Sepolia view is available. Use `mevshield start --build` for both.[/yellow]")
     url = f"http://{host}:{port}"
     console.print(Panel.fit(f"MEV Shield dashboard → [bold]{url}[/bold]\nCtrl-C to stop", title="serve"))
     if open_browser:

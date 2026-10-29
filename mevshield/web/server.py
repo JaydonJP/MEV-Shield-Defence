@@ -7,13 +7,20 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Literal
+from urllib.parse import urlsplit
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .engine import DemoEngine
+from ..chain.public import PublicNetwork
 
 STATIC = Path(__file__).resolve().parent / "static"
 
@@ -38,11 +45,9 @@ class Broadcaster:
 
     def emit(self, event: dict) -> None:
         """Called from the worker thread — schedule the async broadcast on the server loop."""
-        if event.get("kind") in ("phase", "result") and event.get("state") == "start":
-            pass
-        if event.get("kind") == "status":
-            self.history = [event]  # status is a fresh snapshot; drop stale narrative
-        else:
+        if event.get("kind") == "reset" or (event.get("kind") == "run" and event.get("busy")):
+            self.history = []
+        if event.get("kind") != "status":
             self.history.append(event)
             self.history = self.history[-400:]
         if self._loop is not None:
@@ -60,42 +65,122 @@ class Broadcaster:
             self.disconnect(ws)
 
 
+class VaultAction(BaseModel):
+    action: Literal["deploy", "deposit", "withdraw", "pause", "unpause"]
+    account: str = Field(max_length=42)
+    address: str | None = Field(default=None, max_length=42)
+    amount_wei: str = Field(default="0", max_length=24, pattern=r"^[0-9]+$")
+
+
 def create_app() -> FastAPI:
-    app = FastAPI(title="MEV Shield")
     bus = Broadcaster()
     engine = DemoEngine(emit=bus.emit)
+    network = PublicNetwork()
+    action_lock = asyncio.Lock()
+
+    @asynccontextmanager
+    async def lifespan(app):
+        bus.bind_loop(asyncio.get_running_loop())
+        yield
+
+    app = FastAPI(title="MEV Shield", lifespan=lifespan)
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=os.getenv(
+        "MEVSHIELD_ALLOWED_HOSTS", "localhost,127.0.0.1,[::1]"
+    ).split(","))
     app.state.engine = engine
     app.state.bus = bus
+    app.state.network = network
 
-    @app.on_event("startup")
-    async def _startup():
-        bus.bind_loop(asyncio.get_running_loop())
+    @app.middleware("http")
+    async def browser_security(request: Request, call_next):
+        origin = request.headers.get("origin")
+        if request.method == "POST" and origin and urlsplit(origin).netloc != request.headers.get("host"):
+            return JSONResponse({"error": "Cross-origin actions are not allowed."}, status_code=403)
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; script-src 'self'; style-src 'self'; "
+            "connect-src 'self' ws: wss:; img-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+        )
+        return response
 
     async def _run(fn, *args) -> dict:
-        try:
-            return await asyncio.to_thread(fn, *args) or {}
-        except Exception as exc:  # surface engine errors to the UI instead of a 500
-            engine.emit("log", level="critical", text=f"Error: {exc}")
-            return {"error": str(exc)}
+        if action_lock.locked():
+            raise HTTPException(409, "A lab experiment is already running. Please wait.")
+        async with action_lock:
+            scenario = {"run_sandwich": "sandwich", "predict": "sandwich", "run_oracle": "oracle",
+                        "run_governance": "governance", "run_arbitrage": "arbitrage"}.get(fn.__name__)
+            protected = (bool(args[1]) if fn.__name__ == "run_sandwich" else
+                         (args[0] == "safe" or bool(args[1])) if fn.__name__ == "run_oracle" else
+                         args[0] == "safe" if fn.__name__ == "run_governance" else False)
+            engine.emit("run", busy=True, scenario=scenario, protected=protected,
+                        amount=args[0] if fn.__name__ in ("run_sandwich", "predict") else None,
+                        target=args[0] if fn.__name__ in ("run_oracle", "run_governance") else None,
+                        defense_choice=args[2] if fn.__name__ == "run_sandwich" else None)
+            try:
+                if scenario:
+                    engine.emit("baseline", snapshot=await asyncio.to_thread(engine.status))
+                return await asyncio.to_thread(fn, *args) or {}
+            except Exception as exc:
+                engine.emit("log", level="critical", text=f"Experiment stopped: {exc}")
+                raise HTTPException(400, str(exc)) from exc
+            finally:
+                engine.emit("run", busy=False)
 
     @app.get("/api/status")
     async def status():
+        if action_lock.locked():
+            return JSONResponse({"busy": True})
         return JSONResponse(await asyncio.to_thread(engine.status))
+
+    @app.get("/api/network")
+    async def network_status():
+        return await asyncio.to_thread(network.status)
+
+    @app.get("/api/network/vault")
+    async def vault(address: str = Query(max_length=42), account: str = Query(max_length=42)):
+        try:
+            return await asyncio.to_thread(network.vault_state, address, account)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        except Exception as exc:
+            raise HTTPException(503, "Unable to read the vault from Sepolia.") from exc
+
+    @app.post("/api/network/prepare")
+    async def prepare(action: VaultAction):
+        try:
+            tx = await asyncio.to_thread(network.prepare, action.action, action.account, action.address, action.amount_wei)
+            return {"transaction": tx}
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        except Exception as exc:
+            raise HTTPException(503, "Sepolia is unavailable. No transaction was submitted.") from exc
+
+    @app.get("/api/network/receipt/{tx_hash}")
+    async def receipt(tx_hash: str):
+        try:
+            return await asyncio.to_thread(network.receipt, tx_hash)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        except Exception as exc:
+            raise HTTPException(503, "Could not check this transaction. Check its explorer link.") from exc
 
     @app.post("/api/reset")
     async def reset():
         return JSONResponse(await _run(engine.reset))
 
     @app.post("/api/sandwich")
-    async def sandwich(amount: float = 500, protect: bool = False):
-        return JSONResponse(await _run(engine.run_sandwich, amount, protect))
+    async def sandwich(amount: float = Query(500, gt=0, le=100_000, allow_inf_nan=False), protect: bool = False,
+                       defense: Literal["auto", "adaptive-slippage", "private-relay", "commit-reveal", "split"] = "auto"):
+        return JSONResponse(await _run(engine.run_sandwich, amount, protect, defense))
 
     @app.post("/api/predict")
-    async def predict(amount: float = 500):
+    async def predict(amount: float = Query(500, gt=0, le=100_000, allow_inf_nan=False)):
         return JSONResponse(await _run(engine.predict, amount))
 
     @app.post("/api/oracle")
-    async def oracle(target: str = "vulnerable", guard: bool = False):
+    async def oracle(target: Literal["vulnerable", "safe"] = "vulnerable", guard: bool = False):
         return JSONResponse(await _run(engine.run_oracle, target, guard))
 
     @app.post("/api/arbitrage")
@@ -103,15 +188,19 @@ def create_app() -> FastAPI:
         return JSONResponse(await _run(engine.run_arbitrage))
 
     @app.post("/api/governance")
-    async def governance(target: str = "vulnerable"):
+    async def governance(target: Literal["vulnerable", "safe"] = "vulnerable"):
         return JSONResponse(await _run(engine.run_governance, target))
 
     @app.websocket("/ws")
     async def ws(websocket: WebSocket):
+        origin = websocket.headers.get("origin")
+        if origin and urlsplit(origin).netloc != websocket.headers.get("host"):
+            await websocket.close(code=1008)
+            return
         await bus.connect(websocket)
         try:
             # replay current status + recent narrative so a late joiner is in sync
-            snapshot = await asyncio.to_thread(engine.status)
+            snapshot = {"busy": True} if action_lock.locked() else await asyncio.to_thread(engine.status)
             await websocket.send_text(json.dumps({"kind": "status", **snapshot}))
             for ev in bus.history:
                 if ev.get("kind") != "status":

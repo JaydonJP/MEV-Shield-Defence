@@ -1,123 +1,95 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>MEV Shield</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="/static/styles.css" />
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff">
+<meta name="description" content="Watch blockchain attacks unfold, understand the defenses, and try a protected vault on Ethereum Sepolia.">
+<title>MEV Shield · See what happens on-chain</title><link rel="stylesheet" href="/static/styles.css"><script defer src="/static/wallet-connection.js"></script><script defer src="/static/app.js"></script>
 </head>
 <body>
-<div id="offline" class="offline hidden">
-  <div class="offline-card">
-    <h2>Devnet not connected</h2>
-    <p>The chain, shadow fork or model is not running. Start everything with:</p>
-    <pre>mevshield start</pre>
-    <p class="muted">This page connects automatically once the system is up.</p>
+<a class="skip-link" href="#main">Skip to content</a>
+<aside class="sidebar">
+  <a class="brand" href="/"><span class="brand-mark">M</span><span>mev<span class="brand-light">shield</span><small>SECURITY, MADE VISIBLE</small></span></a>
+  <div class="nav-label">WORKSPACE</div><nav aria-label="Main navigation">
+    <button class="nav-item active" data-view="lab" aria-current="page"><span class="nav-symbol">◈</span> Attack lab <span class="nav-arrow">↗</span></button>
+    <button class="nav-item" data-view="network"><span class="nav-symbol">▦</span> Live blockchain</button>
+  </nav>
+  <div class="sidebar-bottom"><span class="status-dot" id="side-network-dot"></span><span id="side-network">Connecting to Sepolia</span><small>Public Ethereum test network</small></div>
+</aside>
+<div class="workspace">
+<header class="topbar"><div class="breadcrumb">Workspace <span>/</span> <strong id="page-name">Attack lab</strong></div><div class="top-actions"><span class="network-badge" id="network-badge">Sepolia · connecting</span><button class="button small" id="connect-wallet">Connect wallet ↗</button></div></header>
+<main id="main" tabindex="-1">
+<section id="view-lab" class="view">
+  <div class="page-intro"><div><div class="eyebrow">A LOOK INSIDE THE BLOCKCHAIN</div><h1>See the attack.<br><span>Understand the defense.</span></h1><p>Follow the money, spot the threat, and watch the shield respond.<br>Real contract execution. One step at a time.</p></div><div class="intro-note"><span class="outline-symbol">◇</span><p>You don’t need to<br>read a transaction hash<br>to understand a transaction.</p></div></div>
+  <div class="lab-notice"><span class="status-dot" id="lab-dot"></span><p id="lab-status">Checking the local attack lab…</p><span class="lab-tag">LOCAL EXPERIMENT</span></div>
+  <div class="scenario-tabs" role="tablist" aria-label="Attack scenario">
+    <button role="tab" id="tab-sandwich" aria-selected="true" aria-controls="experiment" class="scenario-tab active" data-scenario="sandwich"><span>01</span> Sandwich attack</button>
+    <button role="tab" id="tab-oracle" aria-selected="false" aria-controls="experiment" class="scenario-tab" data-scenario="oracle"><span>02</span> Oracle manipulation</button>
+    <button role="tab" id="tab-arbitrage" aria-selected="false" aria-controls="experiment" class="scenario-tab" data-scenario="arbitrage"><span>03</span> Flash arbitrage</button>
+    <button role="tab" id="tab-governance" aria-selected="false" aria-controls="experiment" class="scenario-tab" data-scenario="governance"><span>04</span> Governance attack</button>
   </div>
-</div>
-
-<header class="topbar">
-  <div class="brand">
-    <span class="mark">MEV&nbsp;SHIELD</span>
-    <span class="tagline">Predict &amp; prevent flash-loan and MEV attacks</span>
-  </div>
-  <div class="status-pills" id="status-pills">
-    <div class="pill" data-k="main"><span class="dot"></span>Chain</div>
-    <div class="pill" data-k="shadow"><span class="dot"></span>Shadow fork</div>
-    <div class="pill" data-k="model"><span class="dot"></span>Model</div>
-    <div class="pill pill-num" id="pill-block"><span class="k">block</span><span class="v" id="v-block">—</span></div>
-  </div>
-</header>
-
-<section class="controls">
-  <div class="control-group">
-    <span class="group-label">User side — sandwich (T1)</span>
-    <div class="btn-row">
-      <input type="number" id="amount" value="500" min="1" step="50" class="amount" aria-label="Swap size (USDC)" />
-      <button class="btn btn-danger" data-act="sandwich" data-protect="false">Swap, unprotected</button>
-      <button class="btn btn-accent" data-act="predict">Predict</button>
-      <button class="btn btn-success" data-act="sandwich" data-protect="true">Swap, protected</button>
-    </div>
-  </div>
-  <div class="control-group">
-    <span class="group-label">Protocol side</span>
-    <div class="btn-row">
-      <button class="btn btn-danger" data-act="oracle" data-target="vulnerable" data-guard="false">Oracle attack</button>
-      <button class="btn btn-success" data-act="oracle" data-target="vulnerable" data-guard="true">Oracle attack · Guardian on</button>
-      <button class="btn" data-act="oracle" data-target="safe" data-guard="false">Oracle attack · SafeLending</button>
-      <button class="btn" data-act="arbitrage">Arbitrage</button>
-    </div>
-  </div>
-  <div class="control-group control-reset">
-    <button class="btn btn-ghost" data-act="reset">Reset</button>
-  </div>
-</section>
-
-<section class="phases" id="phases" aria-label="Pipeline stage"></section>
-
-<main class="grid">
-  <!-- Event stream -->
-  <section class="panel stream-panel">
-    <div class="panel-head"><h3>Event stream</h3><span class="hint" id="stream-hint">live</span></div>
-    <div class="stream" id="stream"></div>
-  </section>
-
-  <!-- Stage -->
-  <section class="panel stage-panel">
-    <div class="panel-head"><h3>Block builder</h3><span class="hint">ordered by priority fee</span></div>
-    <div id="result-banner" class="result-banner hidden"></div>
-    <div class="mempool" id="mempool-wrap">
-      <div class="sub-label">Pending mempool</div>
-      <div class="mempool-list" id="mempool"></div>
-    </div>
-    <div class="block" id="block-wrap">
-      <div class="sub-label" id="block-label">Current block</div>
-      <div class="block-list" id="block"></div>
-    </div>
-    <div class="prediction hidden" id="prediction">
-      <div class="sub-label">Defense selector — J = harm + gas + latency + revert&nbsp;risk</div>
-      <table class="deftable"><thead><tr>
-        <th>defense</th><th>harm $</th><th>cost $</th><th>latency</th><th>revert</th><th>J $</th>
-      </tr></thead><tbody id="deftable-body"></tbody></table>
-      <div class="pred-meta" id="pred-meta"></div>
-    </div>
-  </section>
-
-  <!-- Telemetry -->
-  <section class="panel tele-panel">
-    <div class="panel-head"><h3>Telemetry</h3></div>
-    <div class="metrics">
-      <div class="metric"><span class="m-label">AMM-A spot</span><span class="m-val" id="m-spot">—</span><span class="m-unit">USDC/WETH</span></div>
-      <div class="metric"><span class="m-label">TWAP</span><span class="m-val" id="m-twap">—</span><span class="m-unit">USDC/WETH</span></div>
-      <div class="metric"><span class="m-label">Vulnerable lending</span><span class="m-val" id="m-vuln">—</span><span class="m-unit">USDC</span></div>
-      <div class="metric"><span class="m-label">Safe lending</span><span class="m-val" id="m-safe">—</span><span class="m-unit">USDC</span></div>
-    </div>
-
-    <div class="alert hidden" id="alert">
-      <div class="alert-head"><span class="alert-label" id="alert-label"></span><span class="alert-by" id="alert-by"></span></div>
-      <ul class="alert-reasons" id="alert-reasons"></ul>
-    </div>
-
-    <div class="model-card" id="model-card">
-      <div class="sub-label">Risk model</div>
-      <div class="model-grid" id="model-grid">
-        <div class="mm"><span>R²</span><b id="mm-r2">—</b></div>
-        <div class="mm"><span>CV R²</span><b id="mm-cv">—</b></div>
-        <div class="mm"><span>MAE</span><b id="mm-mae">—</b></div>
-        <div class="mm"><span>ROC-AUC</span><b id="mm-auc">—</b></div>
+  <section class="experiment-grid" id="experiment" role="tabpanel" aria-labelledby="tab-sandwich">
+    <div class="visual-panel panel">
+      <div class="panel-heading"><div><span class="mini-label">TRANSACTION JOURNEY</span><h2 id="journey-title">A trade with an unwanted guest</h2></div><span class="badge" id="journey-state">Ready to explore</span></div>
+      <p class="panel-description" id="scenario-description">A bot buys just before you and sells just after. You receive fewer tokens; the bot keeps the difference.</p>
+      <div class="journey" id="journey" aria-label="Visual transaction flow">
+        <span class="lane-label">YOUR TRANSACTION</span><div class="flow-track">
+          <div class="flow-node" id="node-user"><div class="node-glyph">YOU</div><strong id="user-node-title">Your wallet</strong><small id="user-node-detail">USDC → WETH</small></div>
+          <div class="connector"><span class="traveler"></span><span class="connector-caption">submit</span></div>
+          <div class="flow-node" id="node-shield"><div class="node-glyph shield-glyph">M</div><strong>MEV Shield</strong><small id="shield-node-detail">Inspect &amp; protect</small></div>
+          <div class="connector"><span class="traveler"></span><span class="connector-caption">settle</span></div>
+          <div class="flow-node" id="node-pool"><div class="node-glyph pool-glyph"><i></i><i></i><i></i></div><strong id="pool-node-title">Liquidity pool</strong><small id="pool-node-detail">Tokens are exchanged</small></div>
+        </div>
+        <div class="threat-track"><div class="attacker-node" id="node-attacker"><span class="attacker-mark">!</span><div><strong id="attacker-title">Sandwich bot</strong><small id="attacker-detail">Watching for a profitable trade</small></div><span class="threat-badge" id="threat-badge">Waiting</span></div><div class="threat-connector"></div></div>
       </div>
-      <div class="imp" id="model-imp"></div>
+      <div class="story-caption" aria-live="polite"><span class="caption-index" id="caption-index">↗</span><div><strong id="story-title">What happens to your trade?</strong><p id="story-text">Choose a protection setting and run the experiment. Each highlighted step follows events from the local Ethereum contracts.</p></div></div>
+      <div class="playback"><span id="playback-source">Waiting for a contract experiment</span><div><button class="text-button" id="replay" disabled>↺ Replay story</button><label>Pace <select id="playback-speed" aria-label="Story playback speed"><option value="1">Guided</option><option value="0.25">Fast</option><option value="0">Instant</option></select></label></div></div>
     </div>
+    <form class="control-panel panel" id="experiment-form">
+      <span class="mini-label">TRY IT YOURSELF</span><h2>Set the scene</h2><p class="muted" id="control-description">Same trade. A different outcome.</p>
+      <div id="swap-controls"><label class="field-label" for="amount">Your trade amount</label><div class="amount-input"><input id="amount" type="number" min="1" max="100000" step="1" value="5000" required><span>USDC</span></div></div>
+      <fieldset id="protection-controls"><legend class="field-label">Protection</legend><div class="segmented"><button class="selected danger-choice" type="button" data-protection="false" aria-pressed="true">Without shield</button><button type="button" data-protection="true" aria-pressed="false">With shield</button></div></fieldset>
+      <div id="defense-field" class="hidden"><label class="field-label" for="defense-choice">Defense mechanism</label><select id="defense-choice" class="field-select"><option value="auto">Let the shield choose</option><option value="adaptive-slippage">Tighten the price limit</option><option value="private-relay">Private transaction relay</option><option value="commit-reveal">Commit, then reveal</option><option value="split">Split into smaller trades</option></select></div>
+      <div id="oracle-field" class="hidden"><label class="field-label" for="oracle-choice">Defense mechanism</label><select id="oracle-choice" class="field-select"><option value="guardian">Guardian circuit breaker</option><option value="safe">Hardened lending market</option></select></div>
+      <div class="setting-note" id="setting-note"><span class="note-icon">!</span><p>Your trade is public. A bot may move the price before it reaches the pool.</p></div>
+      <button type="submit" class="button primary run-button" id="run-experiment"><span id="run-label">Run experiment</span><span>→</span></button>
+      <div class="control-secondary"><button type="button" class="text-button" id="predict">Preview risk</button><button type="button" class="text-button" id="reset-lab">Reset lab ↺</button></div>
+      <p class="fine-print">Lab tokens have no value. Public-chain actions live in <button type="button" class="inline-button" data-view="network">Live blockchain ↗</button></p>
+    </form>
   </section>
-</main>
-
-<footer class="foot">
-  Isolated local devnet · attacker code is a test harness only · nothing touches mainnet
-</footer>
-
-<script src="/static/app.js"></script>
-</body>
-</html>
+  <div class="result-strip" id="result-strip" aria-live="polite"><div><span class="mini-label">THE OUTCOME</span><strong id="outcome-title">Run an experiment to see the difference</strong><p id="outcome-detail">Measured results appear here after the contracts execute.</p></div><div class="result-number"><span id="harm-label">Value lost</span><strong id="harm-value">—</strong><small id="output-comparison">Awaiting execution</small></div></div>
+  <div class="insight-grid">
+    <section class="panel block-panel"><div class="panel-heading"><div><span class="mini-label">WHY ORDER MATTERS</span><h2>Inside the block</h2></div><span class="badge" id="block-number">No block yet</span></div><p class="muted">Transactions execute from top to bottom. Position changes the outcome.</p><ol id="block-transactions" class="block-transactions"><li class="empty-state">Run a scenario to reveal the actual transaction order.</li></ol></section>
+    <section class="panel funds-panel"><div class="panel-heading"><div><span class="mini-label">FOLLOW THE VALUE</span><h2>Price &amp; protocol funds</h2></div><span class="badge">Measured on-chain</span></div><div class="price-legend"><span><i class="legend-dot"></i>Market price <b id="spot-value">—</b></span><span><i class="legend-dot twap"></i>Average price <b id="twap-value">—</b></span></div><div id="price-chart" class="price-chart"><p class="empty-state">Price samples appear when the lab is online.</p></div><div class="funds-row"><span>Unprotected lending pool<strong id="funds-vulnerable">—</strong></span><span>Hardened lending pool<strong id="funds-safe">—</strong></span></div><p class="chart-footnote">Pool A prices come from reserve events in transaction receipts and block snapshots. Points follow execution order, not elapsed time.</p></section>
+  </div>
+  <section class="panel prediction-panel hidden" id="prediction-panel"><div class="panel-heading"><div><span class="mini-label">THE SHIELD’S DECISION</span><h2>Which defense costs you less?</h2></div><span class="badge" id="prediction-meta"></span></div><p class="muted">Compared using predicted loss, transaction fees, waiting time, and the chance of a failed trade.</p><div class="table-scroll"><table><thead><tr><th>Defense</th><th>Predicted loss</th><th>Fees</th><th>Extra blocks</th><th>Failure risk</th><th>Total score</th></tr></thead><tbody id="defense-rows"></tbody></table></div><p id="prediction-summary"></p></section>
+  <details class="panel event-panel"><summary><span>Under the hood <small>Contract events &amp; Guardian reasoning</small></span><span id="event-count">0 events</span></summary><div id="guardian-verdict" class="hidden"></div><div id="event-stream" class="event-stream"><p class="empty-state">The technical evidence will appear here.</p></div></details>
+</section>
+<section id="view-network" class="view hidden">
+  <div class="page-intro"><div><div class="eyebrow">REAL NETWORK. VERIFIABLE ACTIVITY.</div><h1>Meet the<br><span>live blockchain.</span></h1><p>Explore Ethereum Sepolia, then deploy your own protected vault.<br>Your wallet signs. The network executes. The explorer proves it.</p></div><a class="button" href="https://sepolia.etherscan.io" target="_blank" rel="noopener noreferrer">Open explorer ↗</a></div>
+  <div class="network-summary"><div><span class="mini-label">NETWORK</span><strong>Ethereum Sepolia</strong><small>Public testnet · Chain 11155111</small></div><div><span class="mini-label">LATEST BLOCK</span><strong id="live-height">—</strong><small id="live-updated">Connecting to the RPC…</small></div><div><span class="mini-label">BASE FEE</span><strong id="live-fee">—</strong><small>gwei per unit of gas</small></div><div><span class="mini-label">CONNECTION</span><strong id="live-connection">Checking</strong><small>Refreshes every 12 seconds</small></div></div>
+  <section class="panel live-block-panel"><div class="panel-heading"><div><span class="mini-label">ARRIVING FROM SEPOLIA</span><h2>The chain keeps moving</h2></div><span class="badge" id="live-source">Public RPC</span></div><div id="live-blocks" class="live-blocks"><p class="empty-state">Reading recent blocks from Ethereum…</p></div><p class="chart-footnote">These are network-wide blocks. Their transactions are not classified as attacks by this app.</p></section>
+  <section class="panel vault-panel"><div class="panel-heading"><div><span class="mini-label">YOUR ON-CHAIN EXPERIMENT</span><h2>A vault with rules that actually run.</h2></div><span class="badge">Test ETH only</span></div><p class="muted">Deploy the ShieldVault contract, deposit a little test ETH, and see the withdrawal rules enforced by Ethereum.</p>
+    <div class="vault-layout"><div><ol class="setup-steps"><li><span>1</span><div><strong>Connect your wallet</strong><p id="wallet-description">Use an Ethereum browser wallet, such as MetaMask.</p></div></li><li><span>2</span><div><strong>Deploy or attach a vault</strong><p>Deployment creates your contract on Sepolia. You become its owner.</p><button class="button" id="deploy-vault">Deploy ShieldVault ↗</button><div class="attach-row"><input id="vault-address" placeholder="Existing vault address · 0x…" aria-label="Existing ShieldVault contract address" maxlength="42"><button class="button small" id="attach-vault">Attach</button></div></div></li><li><span>3</span><div><strong>Test the defenses</strong><p>Try withdrawing during cooldown or exceeding the hourly limit.</p></div></li></ol><p class="fine-print">Need test ETH? See <a href="https://ethereum.org/developers/docs/networks/#sepolia" target="_blank" rel="noopener noreferrer">Sepolia &amp; faucet resources ↗</a>. Wallet approval is required for each transaction.</p></div>
+    <div class="vault-console"><div class="vault-status"><span class="status-dot" id="vault-dot"></span><strong id="vault-title">No vault connected</strong><a id="vault-explorer" class="hidden" target="_blank" rel="noopener noreferrer">View contract ↗</a></div><div class="vault-balance"><span>Your deposited test ETH</span><strong id="vault-balance">— <small>ETH</small></strong></div><div class="vault-policies"><div><span>Withdrawal cooldown</span><b id="cooldown-state">60 seconds after deposit</b></div><div><span>Hourly withdrawal limit</span><b id="limit-state">0.005 ETH / wallet</b></div><div><span>Emergency circuit breaker</span><b id="pause-state">Owner controlled</b></div><div><span>Reentrancy guard</span><b>Enforced in Solidity</b></div></div><label class="field-label" for="vault-amount">Test ETH amount</label><input class="field-select" id="vault-amount" type="text" inputmode="decimal" value="0.001" aria-describedby="vault-amount-note"><small id="vault-amount-note" class="fine-print">Up to 0.01 ETH per action in this interface.</small><div class="vault-actions"><button class="button primary" id="deposit-vault">Deposit ↓</button><button class="button" id="withdraw-vault">Withdraw ↑</button></div><button class="text-button pause-button" id="pause-vault">Pause vault (owner)</button></div></div>
+    <div class="transaction-progress hidden" id="transaction-progress" aria-live="polite"><div class="tx-step" data-step="check">1 · Policy check</div><span>→</span><div class="tx-step" data-step="sign">2 · Wallet signature</div><span>→</span><div class="tx-step" data-step="mine">3 · Network inclusion</div><span>→</span><div class="tx-step" data-step="done">4 · Receipt</div></div>
+    <div id="wallet-message" class="wallet-message" role="status">Connect a wallet to begin. Live block browsing works without one.</div><div id="chain-receipts" class="chain-receipts"></div>
+    <p class="chart-footnote">This vault demonstrates its own defenses. Swap simulations, private relay ordering and Guardian priority ordering run in the local attack lab; they are not public-network guarantees.</p>
+  </section>
+</section>
+<footer><span>MEV Shield <span class="footer-separator">/</span> Blockchain security, explained.</span><span>Local attack lab + public Sepolia network</span></footer>
+</main></div><div id="toast" class="toast hidden" role="alert"></div>
+<dialog id="wallet-setup" class="wallet-setup" aria-labelledby="wallet-setup-title" aria-describedby="wallet-setup-description">
+  <div class="wallet-setup-heading"><span class="mini-label">FIRST TIME USING A WALLET?</span><button class="text-button" id="close-wallet-setup" aria-label="Close wallet setup">Close ×</button></div>
+  <h2 id="wallet-setup-title">Set up a wallet for this demo</h2>
+  <p id="wallet-setup-description">No Ethereum wallet was detected in this browser. Connecting opens a request in your wallet extension; it doesn’t create a wallet for you.</p>
+  <ol class="wallet-setup-steps">
+    <li><strong>Install MetaMask in your browser</strong><p>Use Chrome, Edge, Firefox, or another supported browser. An embedded app browser may not have access to your extensions.</p><a href="https://metamask.io/download/" target="_blank" rel="noopener noreferrer">Get MetaMask from the official website ↗</a></li>
+    <li><strong>Create a separate demo wallet</strong><p>Choose “Create a new wallet” and complete MetaMask’s setup. Keep your password and recovery phrase private; this website never needs them.</p><a href="https://support.metamask.io/start/creating-a-new-wallet" target="_blank" rel="noopener noreferrer">Official wallet creation instructions ↗</a></li>
+    <li><strong>Open this website in that same browser</strong><p>Reload the page, unlock MetaMask, click Connect wallet, and approve the account and Sepolia network requests. Connecting itself needs no ETH.</p></li>
+    <li><strong>Get free test ETH when you’re ready to deploy</strong><p>Use a Sepolia faucet, then return to Live blockchain → Deploy ShieldVault. Use test ETH for this demo.</p><a href="https://ethereum.org/developers/docs/networks/#sepolia" target="_blank" rel="noopener noreferrer">Sepolia testnet and faucet resources ↗</a></li>
+  </ol>
+  <label class="field-label" for="wallet-demo-url">Open this address in your wallet-enabled browser</label>
+  <div class="wallet-url-row"><input id="wallet-demo-url" readonly><button class="button small" id="copy-demo-url">Copy link</button></div>
+  <div class="wallet-setup-footer"><span id="wallet-setup-status" role="status">The attack lab and live block feed also work without a wallet.</span><button class="button primary" id="retry-wallet">Try connecting again ↗</button></div>
+</dialog>
+</body></html>

@@ -13,11 +13,15 @@ import {TWAPOracle} from "./TWAPOracle.sol";
 contract SafeLending is LendingBase {
     TWAPOracle public immutable oracle;
     uint256 public immutable maxDeviationBps;
+    uint256 public constant MAX_BORROW_PER_BLOCK = 100_000 ether;
+    uint256 public borrowBlock;
+    uint256 public borrowedThisBlock;
 
     constructor(Token collateral_, Token debt_, SimpleAMM amm_, address guardian_, TWAPOracle oracle_, uint256 maxDevBps_)
         LendingBase(collateral_, debt_, amm_, guardian_)
     {
         require(address(oracle_.amm()) == address(amm_), "SafeLending: oracle/amm mismatch");
+        require(maxDevBps_ > 0 && maxDevBps_ <= 10_000, "SafeLending: invalid deviation");
         oracle = oracle_;
         maxDeviationBps = maxDevBps_;
     }
@@ -33,7 +37,14 @@ contract SafeLending is LendingBase {
         return (diff * 10_000) / twap;
     }
 
-    function _beforeBorrow() internal view override {
+    function _beforeBorrow(uint256 amount) internal override {
         require(priceDeviationBps() <= maxDeviationBps, "SafeLending: price deviation");
+        require(block.number > lastDepositBlock[msg.sender], "SafeLending: deposit cooldown");
+        if (borrowBlock != block.number) {
+            borrowBlock = block.number;
+            borrowedThisBlock = 0;
+        }
+        require(borrowedThisBlock + amount <= MAX_BORROW_PER_BLOCK, "SafeLending: block borrow limit");
+        borrowedThisBlock += amount;
     }
 }

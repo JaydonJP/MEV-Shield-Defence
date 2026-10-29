@@ -16,6 +16,11 @@ MAX = 2**256 - 1
 def forge_build() -> None:
     forge = config.find_foundry_bin("forge")
     subprocess.run([forge, "build"], cwd=config.CONTRACTS_DIR, check=True, capture_output=True)
+    from .public import ASSET, vault_artifact
+    compiled = json.loads((config.OUT_DIR / "ShieldVault.sol" / "ShieldVault.json").read_text())
+    ASSET.write_text(json.dumps({"abi": compiled["abi"], "bytecode": compiled["bytecode"]["object"],
+                                "runtime": compiled["deployedBytecode"]["object"]}, indent=2) + "\n")
+    vault_artifact.cache_clear()
 
 
 def _deploy(chain: Chain, acct, name: str, *args) -> str:

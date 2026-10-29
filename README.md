@@ -1,7 +1,8 @@
 # 🛡️ MEV Shield
 
-**Predict and prevent flash-loan and MEV attacks *before* they execute** — demonstrated end-to-end on an
-isolated local Ethereum devnet with a CLI command chain and a live web dashboard.
+**See blockchain attacks and their defenses, one transaction at a time.** MEV Shield combines a visual
+Ethereum attack lab with a live connection to **Ethereum Sepolia**, including wallet-signed deployment
+and interaction with a protected test-ETH vault. The website uses a responsive white theme.
 
 Every attack we care about passes through two places before it does damage: the **mempool** (where pending
 transactions wait) and the **EVM** (where they execute). MEV Shield sits at both. It keeps a private
@@ -11,8 +12,9 @@ the user's transaction so a sandwich is unprofitable, or has a Guardian pause th
 block, ordered *before* an attack, so the attack reverts.
 
 > The attacker code in `contracts/src/harness/` and `mevshield/harness/` is a **test harness only** — it
-> exists to prove the shield works. Everything runs on a local devnet; nothing touches mainnet or real
-> protocols.
+> exists to prove the shield works on the local Anvil lab. The separate Sepolia view reads the public
+> network and supports real testnet vault transactions. It never uses the public Anvil keys. Mainnet
+> transactions are not supported.
 
 See [PLAN.md](PLAN.md) for the full design and [docs/REPORT.md](docs/REPORT.md) for the write-up.
 
@@ -43,9 +45,9 @@ py -V:Astral/CPython3.12.13 -m venv .venv      # or: python3.12 -m venv .venv
 .venv\Scripts\pip install -e .
 
 # 3. (optional) run the test suites
-cd contracts && forge test && cd ..            # 22 Solidity tests
+cd contracts && forge test && cd ..            # 29 Solidity tests
 .venv\Scripts\pip install pytest
-.venv\Scripts\python -m pytest tests -q        # 12 Python tests
+.venv\Scripts\python -m pytest tests -q        # 30 Python tests
 ```
 
 All `mevshield …` commands below assume the venv is active (`.venv\Scripts\activate`), or prefix them with
@@ -56,12 +58,17 @@ All `mevshield …` commands below assume the venv is active (`.venv\Scripts\act
 ## The live web demo — one command
 
 ```bash
-mevshield start
+mevshield start --build
 ```
 
 `start` boots the chain + shadow fork, deploys and seeds everything, trains the ML model if needed, then
 opens the **web dashboard** (`http://127.0.0.1:8000`). From that single page you drive the whole system and
-watch it react in real time:
+watch it react in real time. The main view explains each step with an animated transaction journey,
+actual token movements decoded from receipts, transaction ordering, a price chart that includes
+intra-block reserve changes, and measured outcomes. Replay repeats the story without sending new
+transactions. The four scenario tabs expose sandwich, oracle, benign arbitrage, and governance cases.
+
+Available experiments include:
 
 - **Swap, unprotected** — the sandwich bot front-runs; the block renders live as `[frontrun, victim, backrun]`
   and the victim's loss is shown.
@@ -74,8 +81,65 @@ watch it react in real time:
 - **Oracle attack · SafeLending** — fails by design (TWAP + deviation guard).
 - **Arbitrage** — a flash loan with profit but no protocol loss → correctly ruled **benign** (no false positive).
 
-The event stream, block builder, Guardian alerts, live telemetry and the trained-model panel all update over
-a WebSocket as each scenario runs.
+The event stream, block builder, Guardian alerts, and live telemetry update over
+a WebSocket as each scenario runs. Technical evidence is available under **Under the hood**; plain-language
+explanations lead the interface. Choose an individual swap defense or let the selector recommend one.
+
+### Real blockchain: Ethereum Sepolia
+
+The **Live blockchain** view works even when the local lab is offline:
+
+1. Start the website with `mevshield serve --no-open-browser`, or use `mevshield start --build` for both modes.
+2. Open `http://127.0.0.1:8000/#network`. Recent blocks are read from the public RPC, with explorer links.
+3. Open the website in a browser with an EIP-1193 Ethereum wallet (for example, MetaMask). Click **Connect wallet**;
+   the app requests Sepolia, chain **11155111**. A Codex browser panel may not have a wallet extension.
+4. Fund your wallet with Sepolia test ETH using the [Ethereum testnet resources](https://ethereum.org/developers/docs/networks/#sepolia).
+5. Click **Deploy ShieldVault**, review the transaction in your wallet, and wait for a receipt. Alternatively,
+   attach an existing matching vault address; the backend verifies its deployed runtime bytecode.
+6. Deposit e.g. **0.001 ETH**. An immediate withdrawal is rejected by the contract’s **60-second cooldown**
+   during preflight. After the cooldown, withdraw and inspect the real receipt and contract events.
+7. Test the **0.005 ETH per wallet per hour** withdrawal budget or use the owner-only **pause / unpause** control.
+
+New to wallets? **Connect wallet** opens setup instructions when no extension is found, including
+official MetaMask links and a copyable app URL. Create a separate demo wallet, open the app in the same
+browser as the extension, and approve the connection. You can connect before getting test ETH; only
+deployment and transactions need faucet funds. Pending or declined wallet requests now have visible,
+actionable messages. Run `node --test tests/wallet-connection.test.cjs` to check the connection adapter
+without installing a wallet.
+
+The server only reads chain state and prepares unsigned, chain-bound transactions. Your wallet holds your
+keys and signs each write. The UI tracks a submitted hash across refreshes, reports reversions and gas use,
+and distinguishes inclusion from finality. There is no automatic public-network deployment at startup.
+
+The default RPC is `https://ethereum-sepolia-rpc.publicnode.com`. To use your own provider, set
+`MEVSHIELD_SEPOLIA_RPC` in the server environment. Chain-ID mismatches fail closed. Credential-bearing
+RPC URLs are never sent to the browser. Public endpoints can throttle; failures are displayed explicitly.
+
+**Scope:** the vault’s Solidity protections run on Sepolia. The existing AMMs, attack harness, shadow-fork
+simulations, local private relay, and controlled Guardian ordering remain in the labeled local lab. A
+higher tip does not guarantee priority on a public chain, and the app does not claim to monitor or protect
+all Sepolia transactions. See [docs/WEB-EXPERIENCE.md](docs/WEB-EXPERIENCE.md) for the walkthrough and limits.
+
+### Additional defenses
+
+- **SafeLending:** deposit collateral in an earlier block before borrowing; aggregate borrowing is capped
+  at **100,000 lab USDC per block**, in addition to the TWAP and 5% deviation check.
+- **ShieldVault:** reentrancy guard, effects before ETH transfers, deposit cooldown, per-wallet hourly
+  withdrawal budget, and owner-only emergency pause, with events for observable state changes.
+- **Website:** bounded/typed inputs, one lab operation at a time (including reset), same-origin browser
+  actions and WebSockets, trusted hosts, and a restrictive content security policy. The server binds to
+  localhost by default. For a custom hostname, explicitly set `MEVSHIELD_ALLOWED_HOSTS` to a comma-separated
+  allowlist; exposing this educational server publicly also requires deployment-specific authentication.
+
+After changing Solidity, run `forge build` in `contracts/`, then `python scripts/export_vault.py` at the
+repository root to update the packaged wallet artifact. `mevshield start --build` also exports it. Restart
+the server after recompilation. If the lab was already running older contracts, use `mevshield down` before
+starting again; resetting a snapshot does not upgrade deployed bytecode.
+
+Validation: `forge test` in `contracts/` (29 tests) and `python -m pytest tests -q` (30 tests). Install the
+test dependencies with `pip install -e '.[dev]'`. The adapter tests deploy the real vault bytecode on a
+temporary local Anvil instance; they never send transactions to Sepolia. They skip EVM checks if Foundry
+is missing. A real wallet signature and test ETH are required to complete the public deployment.
 
 ---
 
@@ -135,7 +199,7 @@ mevshield down                               # stop the devnet
 ## Repository layout
 
 ```
-contracts/              Foundry project (Solidity 0.8.24) + 22 forge tests
+contracts/              Foundry project (Solidity 0.8.24) + 29 forge tests
   src/                  Token, SimpleAMM, FlashLender, TWAPOracle, Vulnerable/SafeLending,
                         ProtectedRouter, CommitRevealSwap, Governance, harness/ (attackers)
 
@@ -167,7 +231,7 @@ mevshield/              Python package, grouped by responsibility
     engine.py             drives the devnet and emits realtime events
     static/               index.html · styles.css · app.js  (no framework)
 
-tests/                  Python unit tests (12)
+tests/                  Python math, predictor, web and network adapter tests (30), plus wallet JS tests
 data/                   deployments.json, results.csv, model.pkl, mevshield.db (generated)
 docs/                   report, architecture diagram, slides outline
 ```

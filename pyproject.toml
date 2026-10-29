@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mevshield"
 version = "1.0.0"
-description = "MEV Shield — predict and prevent flash-loan and MEV attacks on a local Ethereum devnet"
+description = "MEV Shield — a visual Ethereum security lab with Sepolia wallet integration"
 requires-python = ">=3.11,<3.14"
 dependencies = [
   "web3>=7,<8",
@@ -21,7 +21,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "httpx>=0.27,<1"]
 
 [project.scripts]
 mevshield = "mevshield.cli:app"

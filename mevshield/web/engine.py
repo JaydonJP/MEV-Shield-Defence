@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import time
 from typing import Callable
+from web3.logs import DISCARD
 
 from .. import config, store
 from ..chain import BlockBuilder, Chain, ShadowFork, account, devnet, deploy
@@ -112,6 +113,33 @@ class DemoEngine:
                 "tip": round(t.tip_gwei, 2), "status": t.status, "labels": t.labels, "private": t.private,
                 "kind": self._classify(t)} for i, t in enumerate(blk.txs)]
         self.emit("block", number=blk.number, txs=txs)
+        # Receipt events expose intra-block reserve moves, including a sandwich's temporary price spike.
+        twap = self.chain.c("oracle").functions.twap().call(block_identifier=blk.number) / config.E
+        addresses = self.chain.deployments["contracts"]
+        for tx in txs:
+            receipt = self.chain.receipt(tx["hash"])
+            price_steps, swaps = [], []
+            for pool in ("ammA", "ammB"):
+                contract = self.chain.c(pool)
+                for event in contract.events.Sync().process_receipt(receipt, errors=DISCARD):
+                    if event["address"].lower() != addresses[pool].lower():
+                        continue
+                    args = event["args"]
+                    if args["reserve0"]:
+                        price_steps.append({"pool": pool, "price": round(args["reserve1"] / args["reserve0"], 4),
+                                            "log_index": event["logIndex"]})
+                for event in contract.events.Swap().process_receipt(receipt, errors=DISCARD):
+                    if event["address"].lower() != addresses[pool].lower():
+                        continue
+                    args = event["args"]
+                    usdc_in = args["tokenIn"].lower() == addresses["USDC"].lower()
+                    swaps.append({"pool": pool, "amount_in": round(args["amountIn"] / config.E, 6),
+                                  "amount_out": round(args["amountOut"] / config.E, 6),
+                                  "token_in": "USDC" if usdc_in else "WETH",
+                                  "token_out": "WETH" if usdc_in else "USDC", "log_index": event["logIndex"]})
+            self.emit("execution", block=blk.number, tx=tx, twap=round(twap, 4),
+                      price_steps=sorted(price_steps, key=lambda e: e["log_index"]),
+                      swaps=sorted(swaps, key=lambda e: e["log_index"]))
 
     def _ml_label(self, amount_usd: float) -> dict:
         if not self.model:
@@ -122,15 +150,16 @@ class DemoEngine:
     # ------------------------------------------------------------------- reset
     def reset(self) -> None:
         if not self.connect():
-            return
+            raise RuntimeError("Local lab is offline. Run mevshield start to launch it.")
         deploy.reset(self.chain)
         self.shadow._forked_at = None
         store.clear_runtime()
+        self.emit("reset")
         self.log("Devnet reset to the clean deployed state.", "info")
         self.emit_status()
 
     # =================================================================== swaps
-    def run_sandwich(self, amount: float, protect: bool) -> dict:
+    def run_sandwich(self, amount: float, protect: bool, defense_choice: str = "auto") -> dict:
         """User swap, with the sandwich bot lurking. protect=False shows the attack; True shows the defense."""
         with self._guard():
             c, sh = self.chain, self.shadow
@@ -152,7 +181,7 @@ class DemoEngine:
                 sel = DefenseSelector(c, RiskEngine(c, sh))
                 selection = sel.evaluate(intent, mode="sim")
                 self._emit_prediction(amount, selection)
-                best = selection.best
+                best = selection.best if defense_choice == "auto" else selection.get(defense_choice)
                 self.log(f"Simulator confirms ${selection.get('public').harm:,.2f} harm if sent public. "
                          f"Selector chooses '{best.name}'.", "info")
                 self._pace()
@@ -172,7 +201,7 @@ class DemoEngine:
                 self._emit_block(blk)
                 self._pace(0.7)
 
-            outcome = "defended" if res.harm_usd < 1 else "attacked"
+            outcome = "reverted" if res.reverted else "defended" if res.harm_usd < 1 else "attacked"
             if res.sandwiched and res.harm_usd < 1:
                 detail = "The bot front-ran, but the tightened bound made its sandwich unprofitable."
             elif res.sandwiched:
@@ -183,9 +212,10 @@ class DemoEngine:
                 detail = "No profitable sandwich existed at this size, so the swap settled normally."
             else:
                 detail = "The swap settled with negligible harm."
-            self.emit("result", title=f"{'Protected' if protect else 'Unprotected'} swap settled",
+            self.emit("result", title=("Swap reverted" if res.reverted else f"{'Protected' if protect else 'Unprotected'} swap settled"),
                       harm_usd=round(res.harm_usd, 2), protected=protect, defense=defense,
-                      sandwiched=res.sandwiched, outcome=outcome, detail=detail,
+                      sandwiched=res.sandwiched, outcome="reverted" if res.reverted else outcome,
+                      detail="The output bound was not met. No tokens were exchanged; gas was spent." if res.reverted else detail,
                       expected_out=round(res.expected_out / config.E, 6),
                       actual_out=round(res.actual_out / config.E, 6))
             store.add_swap({"tx_hash": res.tx_hashes[0], "user": "alice", "amount": amount, "defense": defense,
@@ -246,8 +276,8 @@ class DemoEngine:
             if reverted:
                 outcome, detail = "defended", (
                     "The Guardian paused the market one slot before the attack, so it reverted — funds intact."
-                    if guard else "SafeLending prices collateral with a TWAP, so the single-block manipulation "
-                    "left it unprofitable and the borrow reverted.")
+                    if guard else "SafeLending rejected the borrow. TWAP pricing, the deviation guard, "
+                    "a deposit cooldown and a per-block borrow cap protect this market.")
             else:
                 outcome, detail = "attacked", f"The attacker manipulated the spot price and drained ${drained:,.0f}."
             self.emit("result", title=f"Oracle attack on {target}Lending",
@@ -266,6 +296,8 @@ class DemoEngine:
             self.emit("phase", name="arbitrage", label="Flash-loan arbitrage", state="start")
             if not plan:
                 self.log("No arbitrage opportunity right now.", "info")
+                self.emit("result", title="No price gap to trade", outcome="benign", harm_usd=0,
+                          detail="The two pool prices have already converged. Reset the lab to try the initial opportunity again.")
                 return {}
             self.log(f"Arbitrageur flash-borrows {plan['amount'] / config.E:,.0f} USDC to close a "
                      f"{plan['gap'] * 100:.1f}% price gap between the two pools.", "info")
@@ -327,7 +359,7 @@ class DemoEngine:
         class _Ctx:
             def __enter__(self_):
                 if not engine.connect():
-                    raise RuntimeError("devnet is not running")
+                    raise RuntimeError("Local lab is offline. Run mevshield start to launch it.")
                 engine._busy = True
 
             def __exit__(self_, *a):

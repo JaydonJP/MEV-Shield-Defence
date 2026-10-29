@@ -19,6 +19,7 @@ abstract contract LendingBase {
 
     mapping(address => uint256) public collateralOf;
     mapping(address => uint256) public debtOf;
+    mapping(address => uint256) public lastDepositBlock;
     uint256 public totalCollateral;
     uint256 public totalDebt;
 
@@ -50,7 +51,7 @@ abstract contract LendingBase {
     function collateralPrice() public view virtual returns (uint256);
 
     /// @dev Hook for extra borrow-time checks (SafeLending's deviation guard).
-    function _beforeBorrow() internal view virtual {}
+    function _beforeBorrow(uint256 amount) internal virtual {}
 
     // ------------------------------------------------------------------ views
 
@@ -70,14 +71,16 @@ abstract contract LendingBase {
     // -------------------------------------------------------------- mutations
 
     function deposit(uint256 amount) external whenNotPaused {
+        require(amount > 0, "Lending: zero deposit");
         require(collateralToken.transferFrom(msg.sender, address(this), amount), "Lending: transfer");
         collateralOf[msg.sender] += amount;
+        lastDepositBlock[msg.sender] = block.number;
         totalCollateral += amount;
         emit Deposit(msg.sender, amount);
     }
 
     function borrow(uint256 amount) external whenNotPaused {
-        _beforeBorrow();
+        _beforeBorrow(amount);
         uint256 price = collateralPrice();
         uint256 cap = (((collateralOf[msg.sender] * price) / 1e18) * LTV_BPS) / 10_000;
         require(debtOf[msg.sender] + amount <= cap, "Lending: undercollateralised");
