@@ -333,6 +333,9 @@ def train(samples: int = 20000):
     t.add_row("attack classifier F1", f"{metrics.classifier_f1:.3f}")
     t.add_row("attack ROC-AUC", f"{metrics.roc_auc:.4f}")
     t.add_row("predict latency", f"{metrics.predict_us:.0f} µs")
+    t.add_row("90% interval held-out coverage", f"{metrics.interval_test_coverage:.1%}")
+    t.add_row("probability Brier score", f"{metrics.brier_score:.4f}")
+    t.add_row("calibration / test samples", f"{metrics.calibration_n} / {metrics.test_n}")
     console.print(t)
     top = list(metrics.feature_importances.items())[:4]
     console.print("top features: " + ", ".join(f"{k} ({v:.2f})" for k, v in top))
@@ -382,8 +385,8 @@ def _ensure_up(build: bool = False) -> None:
 
 def _ensure_model() -> None:
     from .defense import HarmPredictor
-    if not HarmPredictor.available():
-        console.print("No trained model found — training one now (this runs once)…")
+    if not HarmPredictor.available() or not HarmPredictor.load().calibration:
+        console.print("No calibrated model found — training one now (this runs once)…")
         m = HarmPredictor(); m.train(log=console.print); m.save()
         console.print("[green]model trained[/green]")
 

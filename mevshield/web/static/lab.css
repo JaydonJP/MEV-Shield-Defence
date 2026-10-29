@@ -1,23 +1,27 @@
+:root { --mono: Consolas, monospace; --sans: "Segoe UI", sans-serif; --panel: #fff; --border: #e4eaec; --border-2: #cbd8dc; --text: #172f35; --bg-2: #f2f6f5; --accent: #087f78; --danger: #bf4b42; }
+body { padding: 0 24px 24px; }
+.btn { border: 1px solid var(--border-2); border-radius: 6px; background: white; color: var(--ink); padding: 10px 16px; font-size: 12px; }
+.btn-accent { background: var(--teal); color: white; border-color: var(--teal); }
 .lab-main { max-width: 1440px; margin: auto; }
 .lab-nav { display: flex; gap: 24px; align-items: center; }
-a { color: #91b3ff; text-decoration: none; }
+a { color: #087f78; text-decoration: none; }
 a:hover { text-decoration: underline; }
 .lab-intro { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 28px 0 20px; }
-.eyebrow,.feature-num { font-family: var(--mono); font-size: 11px; color: #91b3ff; letter-spacing: .08em; }
+.eyebrow,.feature-num { font-family: var(--mono); font-size: 11px; color: #087f78; letter-spacing: .08em; }
 h1 { font-size: clamp(28px, 4vw, 42px); line-height: 1.15; letter-spacing: -.035em; margin: 14px 0; }
 .lab-intro p,.feature-card p,.replay-head p { color: var(--muted); max-width: 740px; }
 .lab-notice { color: var(--muted); padding: 12px 16px; border: 1px solid var(--border); border-radius: 8px; }
-.lab-notice.error { color: #ffafbb; border-color: var(--danger); }
+.lab-notice.error { color: #bf4b42; border-color: var(--danger); }
 .feature-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 24px 0 32px; }
 .feature-card { border: 1px solid var(--border); border-radius: 12px; background: var(--panel); padding: 24px; display: flex; flex-direction: column; gap: 12px; }
 .feature-card h2 { font-size: 20px; letter-spacing: -.025em; }
 .feature-card p { margin: 0 0 6px; }
 .feature-card label { margin-top: auto; }
 .feature-card .btn { align-self: start; }
-.feature-summary { background: linear-gradient(140deg, #172341, var(--panel)); }
+.feature-summary { background: #e8f5f1; }
 .feature-summary a { margin-top: auto; }
 label { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: var(--muted); position: relative; }
-input,select { background: #0b101a; border: 1px solid var(--border-2); border-radius: 6px; padding: 10px 12px; color: var(--text); font: inherit; width: 100%; }
+input,select { background: #f7f9fa; border: 1px solid var(--border-2); border-radius: 6px; padding: 10px 12px; color: var(--text); font: inherit; width: 100%; }
 input:focus,select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 input[type=range] { padding: 4px 0; accent-color: var(--accent); }
 output { position: absolute; right: 0; top: 0; color: var(--text); }
@@ -34,13 +38,13 @@ output { position: absolute; right: 0; top: 0; color: var(--text); }
 .lab-metric { background: var(--bg-2); border-radius: 8px; padding: 16px; }
 .lab-metric .label { font-size: 11px; color: var(--muted); display: block; margin-bottom: 8px; }
 .lab-metric strong { font-family: var(--mono); font-size: 23px; font-weight: 500; color: var(--text); }
-.lab-metric.good strong { color: #71d7ad; }
+.lab-metric.good strong { color: #087f78; }
 .lab-table-wrap { overflow-x: auto; margin: 20px 0; }
 .lab-table { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
 .lab-table th { color: var(--muted); text-align: right; font-weight: 500; padding: 12px 10px; border-bottom: 1px solid var(--border); }
 .lab-table td { text-align: right; padding: 13px 10px; border-bottom: 1px solid var(--border); font-family: var(--mono); }
 .lab-table th:first-child,.lab-table td:first-child { text-align: left; font-family: var(--sans); }
-.lab-table tr.selected { background: #172b36; color: #83e2bd; }
+.lab-table tr.selected { background: #e8f5f1; color: #087f78; }
 .bar-row { display: grid; grid-template-columns: 120px 1fr 95px; gap: 12px; align-items: center; margin: 14px 0; font-size: 12px; }
 .bar-track { background: #202a3e; height: 10px; border-radius: 10px; overflow: hidden; }
 .bar-fill { background: #638ff8; height: 100%; border-radius: 10px; }

@@ -18,6 +18,27 @@ block, ordered *before* an attack, so the attack reverts.
 
 See [PLAN.md](PLAN.md) for the full design and [docs/REPORT.md](docs/REPORT.md) for the write-up.
 
+## Integrated extensions and reliability upgrades
+
+The six extensions from `bhuvang2026in/MEV-Shield-Defence` (commit `157d173`) are integrated with the
+Sepolia vault and dashboard: multi-pool MEV routing, cashback auctions, batch matching, firewall
+lending, coordinated sequence detection, and saved analytical replays. Explore them at `/lab`.
+
+New at **`/safety`**:
+
+- **Stateful invariants:** multi-user vault, lending and settlement sequences, plus guard-removal
+  mutation checks that demonstrate the suite can detect a missing protection.
+- **Transaction safety reports:** simulate known local swaps/lending actions, inspect token/debt changes,
+  approvals and gas, then execute a one-shot state-bound preview and reconcile the actual receipt.
+- **ML uncertainty:** disjoint training/calibration/test sets, nominal harm intervals, calibrated
+  classifier scores, abstention and actual shadow-fork fallback. Failed fallback means unknown risk.
+
+Run `python scripts/verify_security.py` to create verification evidence. `mevshield start --build`
+trains a calibrated model when necessary. Model accuracy and interval coverage concern synthetic
+AMM scenarios, not historical/mainnet performance. A transaction preview is not a guarantee of
+future ordering or MEV protection. See [implementation notes](docs/SECURITY-UPGRADES.md),
+[validation](docs/VALIDATION.md), and [presentation/viva notes for all features](docs/PRESENTATION-NOTES.md).
+
 ## Research extensions
 
 The project now also includes **MEV-aware multi-pool routing, funded backrun cashback auctions,
@@ -60,9 +81,9 @@ py -V:Astral/CPython3.12.13 -m venv .venv      # or: python3.12 -m venv .venv
 .venv\Scripts\pip install -e ".[dev]"
 
 # 3. (optional) run the test suites
-cd contracts && forge test && cd ..            # 29 Solidity tests
+cd contracts && forge test && cd ..            # contract examples, fuzz and invariant tests
 .venv\Scripts\pip install pytest
-.venv\Scripts\python -m pytest tests -q        # 30 Python tests
+.venv\Scripts\python -m pytest tests -q        # offline and adapter tests
 ```
 
 All `mevshield …` commands below assume the venv is active (`.venv\Scripts\activate`), or prefix them with
@@ -151,7 +172,7 @@ repository root to update the packaged wallet artifact. `mevshield start --build
 the server after recompilation. If the lab was already running older contracts, use `mevshield down` before
 starting again; resetting a snapshot does not upgrade deployed bytecode.
 
-Validation: `forge test` in `contracts/` (29 tests) and `python -m pytest tests -q` (30 tests). Install the
+Validation: `forge test` in `contracts/` and `python -m pytest tests -q`. Install the
 test dependencies with `pip install -e '.[dev]'`. The adapter tests deploy the real vault bytecode on a
 temporary local Anvil instance; they never send transactions to Sepolia. They skip EVM checks if Foundry
 is missing. A real wallet signature and test ETH are required to complete the public deployment.
@@ -214,7 +235,7 @@ mevshield down                               # stop the devnet
 ## Repository layout
 
 ```
-contracts/              Foundry project (Solidity 0.8.24) + 29 forge tests
+contracts/              Foundry project (Solidity 0.8.24) + example/fuzz/invariant tests
   src/                  Token, SimpleAMM, FlashLender, TWAPOracle, Vulnerable/SafeLending,
                         ProtectedRouter, CommitRevealSwap, Governance, harness/ (attackers)
 
@@ -246,7 +267,7 @@ mevshield/              Python package, grouped by responsibility
     engine.py             drives the devnet and emits realtime events
     static/               index.html · styles.css · app.js  (no framework)
 
-tests/                  Python math, predictor, web and network adapter tests (30), plus wallet JS tests
+tests/                  Python math, uncertainty, web, safety and integration checks; wallet JS tests
 data/                   deployments.json, results.csv, model.pkl, mevshield.db (generated)
 docs/                   report, architecture diagram, slides outline
 ```

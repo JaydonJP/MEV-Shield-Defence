@@ -156,7 +156,7 @@ def execute(chain: Chain, builder: BlockBuilder, intent: SwapIntent, defense: st
     before = chain.balance(intent.token_out, user)
     r0, r1 = chain.reserves(intent.amm)
     out_px = r1 / r0 if intent.token_out == "WETH" else 1.0  # price *before* execution
-    deadline = lambda: chain.w3.eth.get_block("latest")["timestamp"] + 3600
+    deadline = lambda: chain.deadline(3600)
     router = chain.c("router")
     hashes, blocks = [], []
 

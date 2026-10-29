@@ -82,7 +82,7 @@ def execute_route(chain: Chain, shadow, amount: float, token_in: str = "USDC", s
     d = chain.deployments["contracts"]
     out = "WETH" if token_in == "USDC" else "USDC"
     legs = route["legs"]
-    deadline = chain.w3.eth.get_block("latest")["timestamp"] + 300
+    deadline = chain.deadline()
     fn = chain.c("mevRouter").functions.swap(
         [d[x["pool"]] for x in legs], [x["amount_in"] for x in legs], [x["min_out"] for x in legs],
         d[token_in], d[out], sum(x["min_out"] for x in legs), deadline)

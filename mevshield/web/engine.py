@@ -32,6 +32,7 @@ class DemoEngine:
         self.model: HarmPredictor | None = None
         self._busy = False
         self._action_lock = threading.Lock()
+        self.safety = None
 
     # ------------------------------------------------------------------ wiring
     def set_emitter(self, emit: Callable[[dict], None]) -> None:
@@ -55,6 +56,8 @@ class DemoEngine:
         if self.chain is None:
             self.chain = Chain()
             self.shadow = ShadowFork(self.chain)
+            from ..defense.safety import SafetyReports
+            self.safety = SafetyReports(self.chain, self.shadow)
         if self.model is None and HarmPredictor.available():
             self.model = HarmPredictor.load()
         return True
@@ -146,8 +149,39 @@ class DemoEngine:
     def _ml_label(self, amount_usd: float) -> dict:
         if not self.model:
             return {}
-        r = self.model.predict(amount_usd, self._liquidity_usd(), config.DEFAULT_SLIPPAGE, config.POOL_FEE_BPS, 1.0)
-        return {"risk_harm": round(r["harm_usd"], 2), "p_attack": round(r["p_attack"], 3)}
+        r = self._risk_report(amount_usd, config.DEFAULT_SLIPPAGE)
+        return {"risk_harm": None if r["harm_usd"] is None else round(r["harm_usd"], 2),
+                "p_attack": r["p_attack"], "risk_source": r["source"], "risk_status": r["status"],
+                "risk_interval": r.get("interval_usd"), "risk_reasons": r.get("reasons", [])}
+
+    def _risk_report(self, amount, slippage):
+        def simulate():
+            report = RiskEngine(self.chain, self.shadow).assess(
+                SwapIntent(amount, slippage=slippage), mode="sim", leakage_levels=False)
+            return {"harm_usd": report.harm_public_usd, "p_attack": report.p_attack}
+        if self.model is None:
+            try:
+                return {**simulate(), "source": "simulator", "status": "simulated", "accepted": True,
+                        "interval_usd": None, "reasons": ["ML artifact unavailable; used shadow fork"]}
+            except Exception:
+                return {"harm_usd": None, "p_attack": None, "source": "none", "status": "unknown",
+                        "accepted": False, "reasons": ["Neither model nor simulator is available"]}
+        return self.model.predict_with_fallback(amount, self._liquidity_usd(), slippage,
+            config.POOL_FEE_BPS, (self.chain.base_fee() + config.DEFAULT_TIP) / config.GWEI, simulator=simulate)
+
+    def risk_preview(self, amount, slippage):
+        with self._guard():
+            return self._risk_report(amount, slippage)
+
+    def safety_preview(self, parameters):
+        with self._guard():
+            return self.safety.prepare(**parameters)
+
+    def safety_execute(self, report_id, binding):
+        with self._guard():
+            result = self.safety.execute(report_id, binding)
+            self.emit_status()
+            return result
 
     # ------------------------------------------------------------------- reset
     def reset(self) -> None:
@@ -173,9 +207,11 @@ class DemoEngine:
             ml = self._ml_label(amount)
             self.emit("mempool", txs=[{"role": "alice", "kind": "victim",
                                        "amount_usd": amount, "label": "user swap", **ml}])
-            if ml:
-                self.log(f"ML risk model: expected sandwich harm ${ml['risk_harm']:,.2f}, "
-                         f"P(attack)={ml['p_attack']:.0%}.", "warn" if ml["p_attack"] > 0.5 else "info")
+            if ml and ml["risk_harm"] is not None:
+                self.log(f"Risk estimate ({ml['risk_source']}): sandwich harm ${ml['risk_harm']:,.2f}, "
+                         f"profitable-attack label={ml['p_attack']:.0%}.", "warn" if ml["p_attack"] > 0.5 else "info")
+            elif ml:
+                self.log("Risk unknown: the model abstained and simulation was unavailable.", "warn")
             self._pace()
 
             if protect:

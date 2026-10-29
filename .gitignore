@@ -16,3 +16,5 @@ data/st*.log
 contracts/out/
 contracts/cache/
 contracts/broadcast/
+data/verification*
+data/pytest-*/

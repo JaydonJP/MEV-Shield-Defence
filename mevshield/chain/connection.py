@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -157,6 +158,12 @@ class Chain:
         return role_of(address)
 
     # ------------------------------------------------------------- txs
+    def deadline(self, seconds: int = 300) -> int:
+        """Respect idle blocks AND Anvil's unmined evm_increaseTime offset."""
+        latest = self.w3.eth.get_block("latest")["timestamp"]
+        pending = self.w3.eth.get_block("pending")["timestamp"]
+        return max(latest, pending, int(time.time())) + seconds
+
     def build_tx(self, acct: Acct, fn=None, *, to: str | None = None, data: str = "0x", value: int = 0,
                  tip: int = config.DEFAULT_TIP, gas: int | None = None, nonce: int | None = None) -> dict:
         sender = acct.address

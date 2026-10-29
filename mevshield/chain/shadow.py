@@ -87,14 +87,17 @@ class ShadowFork:
         self.main = main or Chain(config.MAIN_RPC)
         self.chain = Chain(config.SHADOW_RPC, deployments=self.main.deployments)
         self._forked_at: int | None = None
+        self._forked_hash: str | None = None
 
     def sync(self, block: int | None = None) -> int:
         """Re-fork at the main devnet's latest block (no-op if already there)."""
         target = self.main.block_number if block is None else block
         with _process_lock():
-            if self._forked_at != target or self.chain.block_number < target:
+            block_hash = Web3.to_hex(self.main.w3.eth.get_block(target)["hash"])
+            if self._forked_at != target or self._forked_hash != block_hash or self.chain.block_number < target:
                 self.chain.rpc_call("anvil_reset", [{"forking": {"jsonRpcUrl": config.MAIN_RPC, "blockNumber": target}}])
                 self._forked_at = target
+                self._forked_hash = block_hash
         return target
 
     @contextmanager

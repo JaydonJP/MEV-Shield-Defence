@@ -16,7 +16,7 @@ def submit_user_swap(chain: Chain, role: str, amount: float, token_in: str = "US
     quoted = chain.c(amm).functions.quote(d[token_in], amount_in).call()
     if min_out is None:
         min_out = int(quoted * (1 - slippage))
-    fn = chain.c("router").functions.swapExactIn(d[amm], d[token_in], amount_in, min_out, chain.w3.eth.get_block("latest")["timestamp"] + 3600)
+    fn = chain.c("router").functions.swapExactIn(d[amm], d[token_in], amount_in, min_out, chain.deadline(3600))
     return chain.send(account(role), fn, tip=tip, gas=600_000), quoted, min_out
 
 

@@ -9,6 +9,7 @@ from contextlib import contextmanager
 from . import config
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS safety_reports (id TEXT PRIMARY KEY, ts REAL, data TEXT);
 CREATE TABLE IF NOT EXISTS alerts (
     id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL, tx_hash TEXT, sender TEXT, label TEXT, severity TEXT,
     score REAL, features TEXT, action TEXT, latency_ms REAL, block INTEGER
@@ -142,3 +143,17 @@ def save_experiment(name: str, data) -> None:
 def query(sql: str, params: tuple = ()) -> list[dict]:
     with connect() as db:
         return [dict(r) for r in db.execute(sql, params).fetchall()]
+
+
+def relay_pending_count() -> int:
+    return query("SELECT COUNT(*) AS n FROM relay_queue WHERE sent=0")[0]["n"]
+
+
+def save_safety_report(report_id: str, report: dict) -> None:
+    with connect() as db:
+        db.execute("INSERT OR REPLACE INTO safety_reports (id, ts, data) VALUES (?,?,?)",
+                   (report_id, time.time(), json.dumps(report)))
+
+
+def safety_history() -> list[dict]:
+    return [json.loads(r["data"]) for r in query("SELECT data FROM safety_reports ORDER BY ts DESC LIMIT 30")]

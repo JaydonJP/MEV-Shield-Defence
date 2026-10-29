@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Transaction safety · MEV Shield</title>
+  <link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/safety.css">
+  <script src="/static/safety.js" defer></script>
+</head>
+<body>
+<header class="safety-header"><a class="brand" href="/">mevshield</a><nav aria-label="Workspace"><a href="/">Attack lab</a><a href="/lab">Research lab</a><a href="#verification">Verification</a></nav></header>
+<main class="safety-main">
+  <p class="eyebrow">PREVIEW / REVIEW / VERIFY</p><h1>Understand a transaction before it executes.</h1>
+  <p class="intro">Simulate a supported swap or lending action, inspect its changes, then compare the actual receipt. All actions on this page use local mock assets and public Anvil test accounts.</p>
+  <p id="notice" class="notice" role="status">Checking the local chain…</p>
+  <div class="safety-layout">
+    <form id="preview-form" class="safety-panel">
+      <h2>Prepare an action</h2>
+      <label>Action<select name="action"><option value="swap">Swap tokens</option><option value="deposit">Deposit WETH collateral</option><option value="borrow">Borrow USDC</option><option value="repay">Repay USDC debt</option><option value="withdraw">Withdraw WETH collateral</option></select></label>
+      <label>Lab user<select name="role"><option>alice</option><option>bob</option><option>carol</option></select></label>
+      <label>Amount in tokens<input name="amount" type="number" min="0.000001" max="100000" step="any" value="1000" required></label>
+      <label>Swap pool<select name="pool"><option value="ammA">Pool A</option><option value="ammB">Pool B</option></select></label>
+      <label>Swap input token<select name="token_in"><option>USDC</option><option>WETH</option></select></label>
+      <label>Lending market<select name="market"><option value="safe">Safe lending</option><option value="firewall">Firewall lending</option></select></label>
+      <label>Swap slippage %<input name="slippage" type="number" min="0.001" max="20" step="any" value="2" required></label>
+      <button type="submit" class="button primary">Simulate and preview</button>
+      <p class="fine-print">For lending, deposit e.g. 10 WETH first, then preview borrowing 1,000 USDC in a later block. Repayment remains available during a lending pause.</p>
+    </form>
+    <section class="safety-panel" id="report" aria-live="polite"><h2>Your transaction report</h2><p class="muted">A preview shows supported asset changes, debt, approvals, gas and contract policy failures. It is not a guarantee of future execution.</p></section>
+  </div>
+  <section class="safety-panel" id="risk-panel">
+    <h2>How certain is the risk estimate?</h2><p>For USDC → WETH in pool A. The model can abstain; a shadow-fork simulation then runs when available. Its label describes attack profitability under the lab model.</p>
+    <form id="risk-form" class="inline-form"><label>Trade amount · USDC<input name="amount" type="number" min="1" max="100000" value="10000" required></label><label>Slippage %<input name="slippage" type="number" min="0.001" max="20" step="any" value="2" required></label><button class="button" type="submit">Assess risk</button></form>
+    <div id="risk-result" aria-live="polite"></div>
+  </section>
+  <section class="safety-panel" id="verification"><h2>Stateful verification evidence</h2><p>Multi-user sequences exercise vault accounting, lending budgets and settlement escrow. Deliberately weakened variants check that the tests can detect missing protections.</p><button class="button" id="refresh-verification">Read latest verification</button><div id="verification-result" aria-live="polite"></div></section>
+  <section class="safety-panel"><h2>Recent transaction reports</h2><p>History is retained across server restarts. Executable previews expire after two minutes and cannot be reused after a restart. Local resets and isolated experiments can remove recorded blocks from the canonical chain.</p><button class="button" id="refresh-history">Refresh history</button><div id="history"></div></section>
+</main>
+<footer class="safety-main fine-print">Local simulation and inclusion evidence · Sepolia wallet operations are available on the Live blockchain page · no mainnet transactions</footer>
+</body></html>

@@ -90,6 +90,29 @@ class VaultAction(BaseModel):
     amount_wei: str = Field(default="0", max_length=24, pattern=r"^[0-9]+$")
 
 
+class SafetyInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    action: Literal["swap", "deposit", "borrow", "repay", "withdraw"] = "swap"
+    role: Literal["alice", "bob", "carol"] = "alice"
+    amount: float = Field(default=1000, gt=0, le=100000)
+    pool: Literal["ammA", "ammB"] = "ammA"
+    token_in: Literal["USDC", "WETH"] = "USDC"
+    market: Literal["safe", "firewall"] = "safe"
+    slippage: float = Field(default=.02, gt=0, le=.2)
+
+
+class SafetyExecution(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    report_id: str = Field(pattern=r"^[a-f0-9]{32}$")
+    binding: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
+class RiskInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    amount: float = Field(default=1000, gt=0, le=100000)
+    slippage: float = Field(default=.02, gt=0, le=.2)
+
+
 def create_app() -> FastAPI:
     bus = Broadcaster()
     engine = DemoEngine(emit=bus.emit)
@@ -237,6 +260,39 @@ def create_app() -> FastAPI:
     @app.get("/lab")
     async def lab():
         return FileResponse(STATIC / "lab.html")
+
+    @app.get("/safety")
+    async def safety_page():
+        return FileResponse(STATIC / "safety.html")
+
+    @app.post("/api/safety/preview")
+    async def safety_preview(body: SafetyInput):
+        return await _run(engine.safety_preview, body.model_dump())
+
+    @app.post("/api/safety/execute")
+    async def safety_execute(body: SafetyExecution):
+        return await _run(engine.safety_execute, body.report_id, body.binding)
+
+    @app.get("/api/safety/history")
+    async def safety_history():
+        from ..store import safety_history
+        return await asyncio.to_thread(safety_history)
+
+    @app.post("/api/risk")
+    async def risk_report(body: RiskInput):
+        return await _run(engine.risk_preview, body.amount, body.slippage)
+
+    @app.get("/api/verification")
+    async def verification():
+        from .. import config
+        from ..verification import contract_fingerprint
+        path = config.DATA_DIR / "verification.json"
+        if not path.exists():
+            return {"status": "not_run", "message": "Run python scripts/verify_security.py to produce evidence"}
+        report = json.loads(path.read_text())
+        if report.get("source_fingerprint") != contract_fingerprint():
+            report.update(status="stale", message="Contract sources or configuration changed; rerun verification")
+        return report
 
     @app.post("/api/extensions/{feature}")
     async def extension(feature: Literal["routing", "cashback", "batch", "firewall", "coordinated", "all"],

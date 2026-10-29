@@ -140,7 +140,7 @@ def run_coordinated(chain, shadow, amount: float = 10000) -> dict:
                          tip=3 * config.GWEI, gas=600_000)]
     hashes.append(chain.send(account("alice"), chain.c("router").functions.swapExactIn(
         d["ammA"], d["USDC"], size, quote * 98 // 100,
-        chain.w3.eth.get_block("latest")["timestamp"] + 300), tip=2 * config.GWEI, gas=600_000))
+        chain.deadline()), tip=2 * config.GWEI, gas=600_000))
     bought = amm_math.amount_out(front, r1, r0, fee)
     hashes.append(chain.send(back_actor, pool.functions.swap(d["WETH"], bought, 0, front_actor.address),
                              tip=config.GWEI, gas=600_000))

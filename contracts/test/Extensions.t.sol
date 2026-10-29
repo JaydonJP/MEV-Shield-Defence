@@ -248,6 +248,7 @@ contract FirewallExtensionTest is Fixture {
         weth.approve(address(fw), type(uint256).max);
         fw.deposit(100 * E);
         vm.stopPrank();
+        vm.roll(block.number + 1); // preserve SafeLending's earlier-block collateral requirement
     }
 
     function test_sameBlockBudgetAndRepaymentDoesNotResetIt() public {
@@ -282,6 +283,7 @@ contract FirewallExtensionTest is Fixture {
         vm.startPrank(bot);
         weth.approve(address(fw), type(uint256).max);
         fw.deposit(100 * E);
+        vm.roll(block.number + 1);
         fw.borrow(6000 * E);
         vm.stopPrank();
         vm.prank(alice);

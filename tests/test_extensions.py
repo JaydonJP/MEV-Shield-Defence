@@ -117,7 +117,7 @@ def test_pending_order_respects_nonce_before_fee():
 def test_api_validation_and_offline_replays(tmp_path, monkeypatch):
     import mevshield.extensions.replay as replay
     monkeypatch.setattr(replay, "REPLAY_DIR", tmp_path)
-    with TestClient(create_app()) as client:
+    with TestClient(create_app(), base_url="http://localhost") as client:
         assert client.get("/lab").status_code == 200
         assert client.post("/api/replay", json={"amount_usdc": -1}).status_code == 422
         assert client.post("/api/replay", json={"arbitrary": 1}).status_code == 422
@@ -132,11 +132,11 @@ def test_api_validation_and_offline_replays(tmp_path, monkeypatch):
 def test_feature_api_uses_engine_and_reports_failures():
     app = create_app()
     app.state.engine.run_extension = lambda feature, amount: {"feature": feature, "amount": amount}
-    with TestClient(app) as client:
+    with TestClient(app, base_url="http://localhost") as client:
         assert client.post("/api/extensions/routing", json={"amount": 99}).json()["amount"] == 99
         def fail(*args):
             raise RuntimeError("devnet is not running")
         app.state.engine.run_extension = fail
         response = client.post("/api/extensions/routing", json={})
         assert response.status_code == 400
-        assert response.json()["error"] == "devnet is not running"
+        assert response.json()["detail"] == "devnet is not running"

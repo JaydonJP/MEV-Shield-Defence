@@ -26,7 +26,7 @@ def run_batch(chain, amount: float = 1000, match_fraction: float = .75) -> dict:
     # Alice sells USDC; Bob sells WETH. Limits are attached to each escrowed order.
     q_alice = pool.functions.quote(chain.deployments["contracts"]["USDC"], usdc).call()
     q_bob = pool.functions.quote(chain.deployments["contracts"]["WETH"], weth).call()
-    deadline = chain.w3.eth.get_block("latest")["timestamp"] + 600
+    deadline = chain.deadline(600)
     id_a = batch.functions.count().call()
     receipts = [chain.transact(account("alice"), batch.functions.place(False, usdc, q_alice * 98 // 100, deadline))]
     id_b = batch.functions.count().call()
@@ -62,7 +62,7 @@ def run_cashback(chain, amount: float = 1000) -> dict:
     if best["profit"] / config.E <= gas_estimate + .01:
         return {"settled": False, "reason": "no backrun profitable after estimated settlement gas"}
     capital, profit = best["amount"], best["profit"]
-    deadline = chain.w3.eth.get_block("latest")["timestamp"] + 600
+    deadline = chain.deadline(600)
     order = auction.functions.orderHash(account("alice").address, d["ammA"], size, user_out * 98 // 100, deadline).call()
     bids = []
     for role, share in (("arbitrageur", 5000), ("relay", 7500)):

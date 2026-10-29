@@ -1,5 +1,11 @@
 # MEV Shield — Project Report
 
+> This report describes the original baseline. For the current integrated feature set and measured
+> checks, use [reliability upgrades](SECURITY-UPGRADES.md), [validation](VALIDATION.md),
+> [six extensions](EXTENSIONS.md), and [all-feature presentation notes](PRESENTATION-NOTES.md).
+> The representative accuracy and test counts below are historical baseline figures, not current
+> guarantees or a substitute for the documented validation scope.
+
 *Adaptive counterfactual defense against flash-loan and MEV attacks, demonstrated on a local Ethereum devnet.*
 
 > This document describes the original baseline implementation and its reported experiments.
