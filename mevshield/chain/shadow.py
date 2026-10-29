@@ -4,6 +4,7 @@
 ONE block, lets the caller read state, then reverts — the main devnet and its mempool are never touched.
 A cross-process file lock serialises use by the CLI, Guardian, bots and dashboard.
 """
+
 from __future__ import annotations
 
 import sys
@@ -34,10 +35,12 @@ def _process_lock(timeout: float = 60.0):
                 try:
                     if sys.platform == "win32":
                         import msvcrt
+
                         _fh.seek(0)
                         msvcrt.locking(_fh.fileno(), msvcrt.LK_NBLCK, 1)
                     else:
                         import fcntl
+
                         fcntl.flock(_fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
                     break
                 except OSError:
@@ -52,10 +55,12 @@ def _process_lock(timeout: float = 60.0):
             if _depth == 0:
                 if sys.platform == "win32":
                     import msvcrt
+
                     _fh.seek(0)
                     msvcrt.locking(_fh.fileno(), msvcrt.LK_UNLCK, 1)
                 else:
                     import fcntl
+
                     fcntl.flock(_fh.fileno(), fcntl.LOCK_UN)
                 _fh.close()
                 _fh = None
@@ -94,8 +99,22 @@ class ShadowFork:
         target = self.main.block_number if block is None else block
         with _process_lock():
             block_hash = Web3.to_hex(self.main.w3.eth.get_block(target)["hash"])
-            if self._forked_at != target or self._forked_hash != block_hash or self.chain.block_number < target:
-                self.chain.rpc_call("anvil_reset", [{"forking": {"jsonRpcUrl": config.MAIN_RPC, "blockNumber": target}}])
+            if (
+                self._forked_at != target
+                or self._forked_hash != block_hash
+                or self.chain.block_number < target
+            ):
+                self.chain.rpc_call(
+                    "anvil_reset",
+                    [
+                        {
+                            "forking": {
+                                "jsonRpcUrl": config.MAIN_RPC,
+                                "blockNumber": target,
+                            }
+                        }
+                    ],
+                )
                 self._forked_at = target
                 self._forked_hash = block_hash
         return target
@@ -111,11 +130,32 @@ class ShadowFork:
                 self.chain.revert(snap)
                 self.chain.set_automine(True)
 
-    def simulate(self, txs: list[SimTx], before=None, after=None, one_block: bool = True,
-                 per_tx=None) -> SimResult:
+    def simulate(
+        self,
+        txs: list[SimTx],
+        before=None,
+        after=None,
+        one_block: bool = True,
+        per_tx=None,
+        block_sizes: list[int] | None = None,
+    ) -> SimResult:
         """Run `txs` in order (in a single block when `one_block`). `before`/`after` are callables(chain).
-        `per_tx(chain, i, receipt)` forces one block per tx and is called after each one (state probing)."""
+        `per_tx(chain, i, receipt)` forces one block per tx and is called after each one (state probing).
+        """
         res = SimResult()
+        boundaries = set()
+        if block_sizes is not None:
+            if (
+                per_tx is not None
+                or not one_block
+                or any(type(n) is not int or n <= 0 for n in block_sizes)
+                or sum(block_sizes) != len(txs)
+            ):
+                raise ValueError("Invalid simulation block groups")
+            count = 0
+            for size in block_sizes:
+                count += size
+                boundaries.add(count)
         if per_tx is not None:
             one_block = False
             res.per_tx = []
@@ -128,14 +168,28 @@ class ShadowFork:
             ch.set_automine(not one_block)
             hashes = []
             for t in txs:
-                tx = {"from": Web3.to_checksum_address(t.sender), "data": t.data or "0x", "value": hex(t.value),
-                      "gas": hex(t.gas), "maxFeePerGas": hex(200 * config.GWEI), "maxPriorityFeePerGas": "0x0"}
+                tx = {
+                    "from": Web3.to_checksum_address(t.sender),
+                    "data": t.data or "0x",
+                    "value": hex(t.value),
+                    "gas": hex(t.gas),
+                    "maxFeePerGas": hex(200 * config.GWEI),
+                    "maxPriorityFeePerGas": "0x0",
+                }
                 if t.to:
                     tx["to"] = Web3.to_checksum_address(t.to)
                 hashes.append(ch.rpc_call("eth_sendTransaction", [tx]))
+                if len(hashes) in boundaries:
+                    ch.mine()
                 if per_tx is not None:
-                    res.per_tx.append(per_tx(ch, len(hashes) - 1, ch.w3.eth.get_transaction_receipt(hashes[-1])))
-            if one_block and txs:
+                    res.per_tx.append(
+                        per_tx(
+                            ch,
+                            len(hashes) - 1,
+                            ch.w3.eth.get_transaction_receipt(hashes[-1]),
+                        )
+                    )
+            if one_block and txs and block_sizes is None:
                 ch.mine()
             res.receipts = [ch.w3.eth.get_transaction_receipt(h) for h in hashes]
             res.after = after(ch) if after else None
@@ -144,7 +198,12 @@ class ShadowFork:
         return res
 
     def call_tx(self, fn_tx: dict) -> SimTx:
-        return SimTx(fn_tx["from"], fn_tx.get("to"), fn_tx.get("data", "0x"), fn_tx.get("value", 0))
+        return SimTx(
+            fn_tx["from"],
+            fn_tx.get("to"),
+            fn_tx.get("data", "0x"),
+            fn_tx.get("value", 0),
+        )
 
 
 def fn_simtx(sender: str, fn, tag: str = "", gas: int = 2_000_000) -> SimTx:
@@ -156,9 +215,14 @@ def pending_to_simtx(tx: dict) -> SimTx:
     """SimTx replaying a pending mempool transaction (txpool_content format)."""
     val = tx.get("value", "0x0")
     gas = tx.get("gas", "0x1e8480")
-    return SimTx(tx["from"], tx.get("to"), tx.get("input") or tx.get("data") or "0x",
-                 int(val, 16) if isinstance(val, str) else val,
-                 max(int(gas, 16) if isinstance(gas, str) else gas, 100_000), tx.get("hash", ""))
+    return SimTx(
+        tx["from"],
+        tx.get("to"),
+        tx.get("input") or tx.get("data") or "0x",
+        int(val, 16) if isinstance(val, str) else val,
+        max(int(gas, 16) if isinstance(gas, str) else gas, 100_000),
+        tx.get("hash", ""),
+    )
 
 
 def shadow_available() -> bool:
@@ -166,4 +230,3 @@ def shadow_available() -> bool:
         return Chain(config.SHADOW_RPC).w3.is_connected()
     except Exception:
         return False
-

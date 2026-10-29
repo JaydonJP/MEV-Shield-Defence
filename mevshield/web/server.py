@@ -165,7 +165,8 @@ def create_app() -> FastAPI:
             engine.emit("run", busy=True, scenario=scenario, protected=protected,
                         amount=args[0] if fn.__name__ in ("run_sandwich", "predict") else None,
                         target=args[0] if fn.__name__ in ("run_oracle", "run_governance") else None,
-                        defense_choice=args[2] if fn.__name__ == "run_sandwich" else None)
+                        defense_choice=args[2] if fn.__name__ == "run_sandwich" else None,
+                        risk_mode=args[3] if fn.__name__ == "run_sandwich" else args[1] if fn.__name__ == "predict" else None)
             try:
                 if scenario:
                     engine.emit("baseline", snapshot=await asyncio.to_thread(engine.status))
@@ -220,12 +221,26 @@ def create_app() -> FastAPI:
 
     @app.post("/api/sandwich")
     async def sandwich(amount: float = Query(500, gt=0, le=100_000, allow_inf_nan=False), protect: bool = False,
-                       defense: Literal["auto", "adaptive-slippage", "private-relay", "commit-reveal", "split"] = "auto"):
-        return JSONResponse(await _run(engine.run_sandwich, amount, protect, defense))
+                       defense: Literal["auto", "adaptive-slippage", "private-relay", "commit-reveal", "split"] = "auto",
+                       mode: Literal["hybrid", "sim"] = "hybrid"):
+        return JSONResponse(await _run(engine.run_sandwich, amount, protect, defense, mode))
 
     @app.post("/api/predict")
-    async def predict(amount: float = Query(500, gt=0, le=100_000, allow_inf_nan=False)):
-        return JSONResponse(await _run(engine.predict, amount))
+    async def predict(amount: float = Query(500, gt=0, le=100_000, allow_inf_nan=False),
+                      mode: Literal["hybrid", "sim"] = "hybrid", verify: bool = False):
+        return JSONResponse(await _run(engine.predict, amount, mode, verify))
+
+    @app.get("/api/hybrid/benchmark")
+    async def hybrid_results():
+        from .. import config
+        path=config.DATA_DIR/"hybrid-benchmark.json"
+        if not path.exists():
+            return {"status":"not_run","message":"Run mevshield benchmark-hybrid to collect paired execution evidence"}
+        from ..hybrid_benchmark import source_fingerprint
+        report=json.loads(path.read_text())
+        if report["source_fingerprint"] != source_fingerprint():
+            report["status"]="stale"
+        return report
 
     @app.post("/api/oracle")
     async def oracle(target: Literal["vulnerable", "safe"] = "vulnerable", guard: bool = False):

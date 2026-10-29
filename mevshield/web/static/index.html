@@ -48,6 +48,7 @@
     </div>
     <form class="control-panel panel" id="experiment-form">
       <span class="mini-label">TRY IT YOURSELF</span><h2>Set the scene</h2><p class="muted" id="control-description">Same trade. A different outcome.</p>
+      <div id="risk-mode-field"><label class="field-label" for="risk-mode">Risk assessment</label><select id="risk-mode" class="field-select"><option value="hybrid">ML + selective shadow verification</option><option value="sim">Simulation only</option></select></div>
       <div id="swap-controls"><label class="field-label" for="amount">Your trade amount</label><div class="amount-input"><input id="amount" type="number" min="1" max="100000" step="1" value="5000" required><span>USDC</span></div></div>
       <fieldset id="protection-controls"><legend class="field-label">Protection</legend><div class="segmented"><button class="selected danger-choice" type="button" data-protection="false" aria-pressed="true">Without shield</button><button type="button" data-protection="true" aria-pressed="false">With shield</button></div></fieldset>
       <div id="defense-field" class="hidden"><label class="field-label" for="defense-choice">Defense mechanism</label><select id="defense-choice" class="field-select"><option value="auto">Let the shield choose</option><option value="adaptive-slippage">Tighten the price limit</option><option value="private-relay">Private transaction relay</option><option value="commit-reveal">Commit, then reveal</option><option value="split">Split into smaller trades</option></select></div>

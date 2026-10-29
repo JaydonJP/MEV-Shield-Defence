@@ -62,3 +62,14 @@ q("#mainnet-form").addEventListener("submit",async e=>{
   try{const r=await api("/api/mainnet/risk",{pool:data.pool,amount:Number(data.amount),slippage:Number(data.slippage)/100});parent.replaceChildren(node("h3",`${r.status} · ${r.source}`));parent.append(node("p",`Conditional sandwich harm: $${r.harm_usd.toFixed(2)} · block ${r.block.toLocaleString()}.`),node("p",`Reference ETH price: $${r.inputs.eth_price_usd.toFixed(2)} from pool spot. Assumes $5m attacker capital, 420,000 attacker gas units and stablecoins at $1. Private order flow, builder competition and subsequent price moves are not modeled.`));if(r.interval_usd)parent.append(node("p",`90% nominal harm interval: $${r.interval_usd[0].toFixed(2)} – $${r.interval_usd[1].toFixed(2)}. Coverage can change with market conditions.`));for(const reason of r.reasons||[])parent.append(node("p",reason));evidence(parent,r);}
   catch(e){parent.replaceChildren(node("p",e.message));}finally{button.disabled=false;}
 });
+
+async function hybridEvidence(){
+  const r=await api("/api/hybrid/benchmark"),parent=q("#hybrid-result");parent.replaceChildren();
+  if(!r.summary){parent.append(node("p",r.message));return;}
+  parent.append(node("p",`${r.status} · ${r.scope}`));
+  const s=r.summary;table(parent,["Mode","Cases","Decision p50","Shadow bundles","Realized loss","Reverts"],Object.entries(s.modes).map(([mode,m])=>[mode,m.n,`${m.decision_p50_ms.toFixed(0)} ms`,m.shadow_bundles,`$${m.realized_harm_usd.toFixed(2)}`,m.reverts]));
+  parent.append(node("p",`Hybrid decision time reduction: ${s.hybrid_latency_reduction_pct.toFixed(1)}%; shadow bundle reduction: ${s.hybrid_shadow_bundle_reduction_pct.toFixed(1)}%. Recommendation agreement: ${(s.recommendation_agreement*100).toFixed(1)}%.`),node("p",s.interpretation));
+  evidence(parent,r);
+}
+q("#refresh-hybrid").addEventListener("click",()=>hybridEvidence().catch(e=>notice(e.message,true)));
+hybridEvidence().catch(e=>q("#hybrid-result").append(node("p",e.message)));

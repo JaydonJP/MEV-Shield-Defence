@@ -37,6 +37,17 @@ Run `python scripts/verify_security.py` to create verification evidence. A train
 
 The model uses **10,503 real mainnet swap inputs**, declared policy scenarios and separate synthetic lab augmentation. On its chronological counterfactual holdout: **99.91% balanced accuracy, 99.96% recall, $3.23 harm MAE**. These are **modeled economic-risk scores, not observed-attack detection accuracy**; the observed-size holdout has no positive cases. See [data, evaluation and limitations](docs/REAL-MARKET-ML.md), [implementation notes](docs/SECURITY-UPGRADES.md), [validation](docs/VALIDATION.md), and [presentation notes](docs/PRESENTATION-NOTES.md).
 
+## Hybrid selection and current implementation list
+
+The local selector now defaults to **ML estimation with selective shadow-fork verification**. Uncertainty, close cost rankings and large trades trigger verification; selected active protections are checked and costs re-ranked before execution. Both CLI and the attack lab retain a simulation-only mode for comparison.
+
+```powershell
+.venv\Scripts\python.exe -m mevshield.cli predict 1000 --mode hybrid
+.venv\Scripts\python.exe -m mevshield.cli benchmark-hybrid --no-quick --repeats 2
+```
+
+See the [updated implementation list](docs/IMPLEMENTED-FEATURES.md) and [hybrid design, benchmark and limitations](docs/HYBRID-SELECTION.md). The comparison measures realized protection, costs, latency and shadow-fork work from identical local starting states. In the recorded 20-scenario/two-repeat local experiment, hybrid matched simulation-only protection and user cost with **68.44% less total decision time** and **75% fewer shadow bundles**. These are warm local measurements; the analytic control was faster still.
+
 ## Research extensions
 
 The project now also includes **MEV-aware multi-pool routing, funded backrun cashback auctions,

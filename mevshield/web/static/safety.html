@@ -39,6 +39,7 @@
     <div id="mainnet-result" aria-live="polite"></div>
     <details><summary>Training data and held-out evaluation</summary><div id="model-evidence"></div></details>
   </section>
+  <section class="safety-panel" id="hybrid-benchmark"><h2>Does hybrid selection preserve protection?</h2><p>Paired local experiments compare simulation-only, hybrid and analytic selection from identical starting states. They measure actual attacked execution, losses, reverts, user costs, decision latency and shadow-fork work.</p><button class="button" id="refresh-hybrid">Read latest comparison</button><div id="hybrid-result" aria-live="polite"></div></section>
   <section class="safety-panel" id="verification"><h2>Stateful verification evidence</h2><p>Multi-user sequences exercise vault accounting, lending budgets and settlement escrow. Deliberately weakened variants check that the tests can detect missing protections.</p><button class="button" id="refresh-verification">Read latest verification</button><div id="verification-result" aria-live="polite"></div></section>
   <section class="safety-panel"><h2>Recent transaction reports</h2><p>History is retained across server restarts. Executable previews expire after two minutes and cannot be reused after a restart. Local resets and isolated experiments can remove recorded blocks from the canonical chain.</p><button class="button" id="refresh-history">Refresh history</button><div id="history"></div></section>
 </main>

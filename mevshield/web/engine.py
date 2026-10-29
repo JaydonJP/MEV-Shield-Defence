@@ -205,7 +205,7 @@ class DemoEngine:
         self.emit_status()
 
     # =================================================================== swaps
-    def run_sandwich(self, amount: float, protect: bool, defense_choice: str = "auto") -> dict:
+    def run_sandwich(self, amount: float, protect: bool, defense_choice: str = "auto", mode: str = "hybrid") -> dict:
         """User swap, with the sandwich bot lurking. protect=False shows the attack; True shows the defense."""
         with self._guard():
             c, sh = self.chain, self.shadow
@@ -214,7 +214,8 @@ class DemoEngine:
             intent = SwapIntent(amount)
             self.emit("phase", name="intercept", label="Transaction intercepted", state="start")
             self.log(f"User wants to swap {amount:,.0f} USDC → WETH on AMM-A.", "info")
-            ml = self._ml_label(amount)
+            # Protected swaps perform one shared assessment inside the selector.
+            ml = self._ml_label(amount) if not protect else {}
             self.emit("mempool", txs=[{"role": "alice", "kind": "victim",
                                        "amount_usd": amount, "label": "user swap", **ml}])
             if ml and ml["risk_harm"] is not None:
@@ -226,16 +227,16 @@ class DemoEngine:
 
             if protect:
                 self.emit("phase", name="predict", label="Counterfactual prediction", state="start")
-                sel = DefenseSelector(c, RiskEngine(c, sh))
-                selection = sel.evaluate(intent, mode="sim")
+                sel = DefenseSelector(c, RiskEngine(c, sh, predictor=self.model))
+                selection = sel.evaluate(intent, mode=mode)
                 self._emit_prediction(amount, selection)
                 best = selection.best if defense_choice == "auto" else selection.get(defense_choice)
-                self.log(f"Simulator confirms ${selection.get('public').harm:,.2f} harm if sent public. "
+                self.log(f"Risk source {selection.extra['risk_source']} estimates ${selection.get('public').harm:,.2f} public harm. "
                          f"Selector chooses '{best.name}'.", "info")
                 self._pace()
                 self.emit("phase", name="prevent", label=f"Prevention — {best.name}", state="start")
-                res = execute(c, builder, intent, best.name, best.params,
-                              log=lambda m: self.log(m.strip(), "info"))
+                res = sel.execute(builder, selection, choice=defense_choice,
+                                  log=lambda m: self.log(m.strip(), "info"))
                 defense = best.name
             else:
                 self.emit("phase", name="expose", label="Sent to the public mempool", state="start")
@@ -274,27 +275,29 @@ class DemoEngine:
             self.emit_status()
             return {"harm_usd": res.harm_usd, "outcome": outcome}
 
-    def predict(self, amount: float) -> dict:
+    def predict(self, amount: float, mode: str = "hybrid", verify: bool = False) -> dict:
         with self._guard():
             c, sh = self.chain, self.shadow
             self.emit("phase", name="predict", label="Counterfactual prediction", state="start")
-            sel = DefenseSelector(c, RiskEngine(c, sh))
-            selection = sel.evaluate(SwapIntent(amount), mode="sim")
+            sel = DefenseSelector(c, RiskEngine(c, sh, predictor=self.model))
+            selection = sel.evaluate(SwapIntent(amount), mode=mode, require_verification=verify)
             self._emit_prediction(amount, selection)
             self.log(f"Recommendation for {amount:,.0f} USDC: {selection.best.name}.", "info")
-            return {"recommendation": selection.best.name}
+            return {"recommendation": selection.best.name, "decision": selection.extra,
+                    "costs": {e.name:e.J for e in selection.evals}}
 
     def _emit_prediction(self, amount: float, selection) -> None:
         r = selection.report
+        rounded = lambda value, digits=2: None if value is None else round(value,digits)
         defenses = [{"name": e.name, "harm": round(e.harm, 2), "gas": round(e.gas + e.fee, 2),
                      "latency": e.latency_blocks, "revert": round(e.revert_risk, 3), "J": round(e.J, 2),
                      "chosen": e.name == selection.best.name,
                      "slippage": e.params.get("slippage")} for e in sorted(selection.evals, key=lambda e: e.J)]
         self.emit("prediction", amount_usd=amount, harm_public=round(r.harm_public_usd, 2),
-                  attacker_profit=round(r.attacker_profit_usd, 2), p_attack=r.p_attack,
-                  harm_hint=round(r.harm_hint_usd, 2), closed_form_harm=round(r.closed_form_harm_usd, 2),
-                  closed_form_error=round(r.closed_form_error_pct, 3), sim_ms=round(r.sim_ms, 0),
-                  recommendation=selection.best.name, defenses=defenses)
+                  attacker_profit=rounded(r.attacker_profit_usd), p_attack=r.p_attack,
+                  harm_hint=rounded(r.harm_hint_usd), closed_form_harm=rounded(r.closed_form_harm_usd),
+                  closed_form_error=rounded(r.closed_form_error_pct, 3), sim_ms=round(r.sim_ms, 0),
+                  recommendation=selection.best.name, defenses=defenses, decision=selection.extra)
 
     # ============================================================== protocol
     def run_oracle(self, target: str = "vulnerable", guard: bool = False) -> dict:

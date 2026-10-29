@@ -85,7 +85,7 @@ function chooseScenario(name, force = false) {
   text("#user-node-title", s.user); text("#user-node-detail", s.input);
   text("#pool-node-title", s.pool); text("#pool-node-detail", s.output);
   text("#attacker-title", s.actor); text("#attacker-detail", s.actorDetail);
-  show("#swap-controls", name === "sandwich"); show("#predict", name === "sandwich");
+  show("#risk-mode-field", name === "sandwich"); show("#swap-controls", name === "sandwich"); show("#predict", name === "sandwich");
   show("#protection-controls", name !== "arbitrage");
   text("#control-description", name === "arbitrage" ? "Useful activity should pass through." : "Same attack. A different outcome.");
   updateProtection(); clearStory(false); updateControls();
@@ -123,12 +123,12 @@ async function labAction(action, params = {}) {
 }
 $("#experiment-form").addEventListener("submit", (event) => {
   event.preventDefault();
-  if (scenario === "sandwich") labAction("sandwich", { amount: $("#amount").value, protect: protection, defense: $("#defense-choice").value });
+  if (scenario === "sandwich") labAction("sandwich", { amount: $("#amount").value, protect: protection, defense: $("#defense-choice").value, mode: $("#risk-mode").value });
   if (scenario === "oracle") labAction("oracle", { target: protection && $("#oracle-choice").value === "safe" ? "safe" : "vulnerable", guard: protection && $("#oracle-choice").value === "guardian" });
   if (scenario === "arbitrage") labAction("arbitrage");
   if (scenario === "governance") labAction("governance", { target: protection ? "safe" : "vulnerable" });
 });
-$("#predict").addEventListener("click", () => { if ($("#amount").reportValidity()) labAction("predict", { amount: $("#amount").value }); });
+$("#predict").addEventListener("click", () => { if ($("#amount").reportValidity()) labAction("predict", { amount: $("#amount").value, mode: $("#risk-mode").value }); });
 $("#reset-lab").addEventListener("click", () => labAction("reset"));
 function caption(title, description, index = "→") { text("#story-title", title); text("#story-text", description); text("#caption-index", index); }
 function clearStory(clearRecording = true) {
@@ -159,6 +159,7 @@ async function enqueue(event) {
         chooseScenario(ev.scenario, true); protection = !!ev.protected;
         if (ev.amount != null) $("#amount").value = ev.amount;
         if (ev.defense_choice) $("#defense-choice").value = ev.defense_choice;
+        if (ev.risk_mode) $("#risk-mode").value = ev.risk_mode;
         if (ev.scenario === "oracle") $("#oracle-choice").value = ev.target === "safe" ? "safe" : "guardian";
         updateProtection();
       }
@@ -185,7 +186,7 @@ $("#replay").addEventListener("click", async () => {
 const phaseCopy = {
   intercept: ["Your trade enters the journey", "The app reads your swap intent before it reaches the trading pool.", "user"],
   expose: ["The trade becomes visible to bots", "Pending transactions wait in the public mempool. A searcher can calculate whether buying before you would pay.", "user"],
-  predict: ["Try the trade before risking it", "A private copy of the local chain tests the outcome with and without a bot, then compares available defenses.", "shield"],
+  predict: ["Try the trade before risking it", "ML estimates risk first; uncertain decisions and proposed active protections are checked on a private copy of the chain before the cost comparison is finalized.", "shield"],
   prevent: ["Change the conditions of the trade", "The selected defense changes the price bound, submission route, or timing before the trade executes.", "shield"],
   attack: ["Borrowed funds enter the picture", "The attacker attempts to turn temporary borrowed funds into a lasting loss for the target protocol.", "user"],
   detect: ["Look for harm, not just a flash loan", "The Guardian replays the pending transaction and examines price changes, protocol losses and sender profit.", "shield"],
@@ -281,14 +282,14 @@ function renderExecution(ev) {
 }
 const defenseNames = { public: "Public transaction", "adaptive-slippage": "Tighter price limit", "private-relay": "Private relay", "commit-reveal": "Commit, then reveal", split: "Smaller trade chunks" };
 function renderPrediction(ev) {
-  show("#prediction-panel"); text("#prediction-meta", `${number(ev.sim_ms, 0)} ms simulation`);
+  show("#prediction-panel"); text("#prediction-meta", `${ev.decision?.requested_mode || "sim"} · ${number(ev.decision?.decision_ms ?? ev.sim_ms, 0)} ms · ${ev.decision?.shadow_bundles ?? "—"} shadow bundles`);
   const body = $("#defense-rows"); body.replaceChildren();
   ev.defenses.forEach((defense) => {
     const row = node("tr", defense.chosen ? "chosen" : "");
     [defenseNames[defense.name] + (defense.chosen ? " · Recommended" : ""), money(defense.harm), money(defense.gas), defense.latency, number(defense.revert * 100, 1) + "%", money(defense.J)].forEach((value) => row.append(node("td", "", value)));
     body.append(row);
   });
-  text("#prediction-summary", `Without protection, the simulator predicts ${money(ev.harm_public)} in loss. Recommended: ${defenseNames[ev.recommendation]}. These scores are model estimates for the local lab.`);
+  text("#prediction-summary", `Public harm estimate: ${money(ev.harm_public)} from ${ev.decision?.risk_source || "shadow-fork"}. Recommended: ${defenseNames[ev.recommendation]}. Verification: ${ev.decision?.verification || "shadow-fork"}. ${(ev.decision?.fallback_reasons || []).join("; ")}. These are conditional local-lab estimates.`);
   caption("The shield has compared the options", `Predicted public-trade loss: ${money(ev.harm_public)}. The lowest total score belongs to ${defenseNames[ev.recommendation].toLowerCase()}.`, "↗");
 }
 function renderResult(ev) {

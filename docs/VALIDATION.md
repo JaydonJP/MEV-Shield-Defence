@@ -64,3 +64,15 @@ There are two upstream deprecation warnings from websockets and the installed St
 - A wheel build succeeded and includes the compressed model and model card. The real-context data, frozen metrics, undefined observed-traffic recall and assumptions are detailed in [REAL-MARKET-ML.md](REAL-MARKET-ML.md).
 
 Browser automation was unavailable for the final visual check. HTTP/API and JavaScript checks cover the new interface behavior; no screenshot-level validation is claimed. Solidity sources did not change in this upgrade, so the earlier Foundry evidence remains the relevant contract verification run.
+
+
+## Hybrid selection validation — 30 October 2026
+
+- Full Python suite with deployed main/shadow nodes and `MEVSHIELD_INTEGRATION=1`: **117 passed**, including 14 EVM integration cases. Two existing third-party deprecation warnings remain.
+- Hybrid tests exercise ML-only decisions, invalid/abstained predictions, mandatory verification, overlapping cost intervals, cost changes and re-ranking, unavailable shadow verification, stale/mismatched decisions, source trace honesty, exact split remainder handling, block-group validation, API mode propagation, paired state consistency and reverted-trade safety accounting.
+- Real EVM checks verify ML-only and forced-shadow paths without changing main state, actual selected-protection execution, stale execution rejection, and multi-block split verification against an actual attacked split.
+- Expanded paired comparison: **20 scenarios × 2 repeats × 4 modes = 160 isolated EVM executions**. Hybrid and simulation-only choices matched in all 40 comparisons; both had zero realized protected token loss and zero reverts, with identical $44.11 aggregate realized user cost. Hybrid reduced total warm decision time by **68.44%**, shadow bundles/transactions by **75%**, and client CPU time by **62.25%**. The unprotected control lost $5,472.04. These are local descriptive measurements; the analytic baseline was faster still.
+- Wallet JavaScript checks: **8 passed**. Updated dashboard/safety scripts passed JavaScript syntax checks.
+- The saved source fingerprint matches the final measured risk/selection/model-card code. Detailed timings, cold model load, limitations and committed evidence: [HYBRID-SELECTION.md](HYBRID-SELECTION.md).
+
+The simulation-only label now requires an actual shadow fork rather than silently substituting arithmetic. Solidity sources did not change in this upgrade. Browser automation was unavailable in this session, so no screenshot-level visual verification is claimed.

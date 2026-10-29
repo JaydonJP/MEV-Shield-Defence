@@ -23,6 +23,7 @@ def client(application):
     "/api/sandwich?amount=nan", "/api/sandwich?amount=inf", "/api/predict?amount=-1",
     "/api/sandwich?amount=100001", "/api/oracle?target=router", "/api/governance?target=ammA",
     "/api/sandwich?defense=unknown",
+    "/api/sandwich?mode=unknown", "/api/predict?mode=unknown",
 ])
 def test_invalid_lab_actions_never_reach_engine(client, path):
     assert client.post(path).status_code == 422
@@ -63,6 +64,8 @@ def test_simultaneous_reset_cannot_interrupt_an_experiment(application, client, 
         return {"benign": True}
 
     monkeypatch.setattr(application.state.engine, "run_arbitrage", run_arbitrage)
+    # This concurrency unit test must not block on a real node or model artifact.
+    monkeypatch.setattr(application.state.engine, "status", lambda: {"ready": True})
     replies = []
     worker = threading.Thread(target=lambda: replies.append(client.post("/api/arbitrage")))
     worker.start()
@@ -84,6 +87,18 @@ def test_history_keeps_the_latest_result_after_status():
     assert any(event["kind"] == "result" for event in bus.history)
     bus.emit({"kind": "reset"})
     assert bus.history == [{"kind": "reset"}]
+
+
+def test_risk_mode_and_verification_request_reach_shared_selector(application,client,monkeypatch):
+    monkeypatch.setattr(application.state.engine,"status",lambda:{"ready":True})
+    received=[]
+    def predict(amount,mode,verify):
+        received.append((amount,mode,verify))
+        return {"recommendation":"public","decision":{"requested_mode":mode}}
+    monkeypatch.setattr(application.state.engine,"predict",predict)
+    response=client.post("/api/predict?amount=10&mode=sim&verify=true")
+    assert response.status_code==200 and received==[(10,"sim",True)]
+    assert response.json()["decision"]["requested_mode"]=="sim"
 
 
 def test_vault_preparation_requires_validated_action(client):

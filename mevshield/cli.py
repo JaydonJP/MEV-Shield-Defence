@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import sys
 import time
+from enum import Enum
 
 import typer
 from rich.console import Console
@@ -43,6 +44,12 @@ if sys.platform == "win32":
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:
         pass
+
+
+class RiskMode(str, Enum):
+    hybrid = "hybrid"
+    sim = "sim"
+    fast = "fast"
 
 
 def _chain() -> Chain:
@@ -166,7 +173,8 @@ def arb():
 @app.command()
 def swap(amount: float, public: bool = typer.Option(False, "--public"),
          protect: bool = typer.Option(False, "--protect"),
-         slippage: float = typer.Option(config.DEFAULT_SLIPPAGE), token_in: str = "USDC"):
+         slippage: float = typer.Option(config.DEFAULT_SLIPPAGE), token_in: str = "USDC",
+         mode: RiskMode = RiskMode.hybrid, verify: bool = False):
     """Act 2 — send a swap. --public (exposed), --protect (selector picks a defense), or just quote."""
     from .defense import DefenseSelector, execute
     from .defense import RiskEngine, SwapIntent
@@ -178,13 +186,13 @@ def swap(amount: float, public: bool = typer.Option(False, "--public"),
 
     if protect:
         sel = DefenseSelector(chain, RiskEngine(chain, shadow))
-        selection = sel.evaluate(intent, mode="sim")
+        selection = sel.evaluate(intent, mode=mode.value, require_verification=verify)
         best = selection.best
         console.print(Panel.fit(
             f"predicted public harm [red]${selection.get('public').harm:,.2f}[/red] → "
             f"selector picks [bold green]{best.name}[/bold green] (J=${best.J:,.2f})",
             title=f"Act 2 — swap {amount:,} {token_in} (protected)"))
-        res = execute(chain, builder, intent, best.name, best.params, log=console.print)
+        res = sel.execute(builder, selection, log=console.print)
         defense = best.name
     else:
         console.print(Panel.fit(f"swap {amount:,} {token_in} straight to the public mempool",
@@ -204,7 +212,8 @@ def swap(amount: float, public: bool = typer.Option(False, "--public"),
 
 
 @app.command()
-def predict(amount: float, slippage: float = typer.Option(config.DEFAULT_SLIPPAGE), token_in: str = "USDC"):
+def predict(amount: float, slippage: float = typer.Option(config.DEFAULT_SLIPPAGE), token_in: str = "USDC",
+            mode: RiskMode = RiskMode.hybrid, verify: bool = False):
     """Act 2 — BEFORE sending: predicted loss, attacker profit, harm per defense, recommendation."""
     from .defense import DefenseSelector
     from .defense import RiskEngine, SwapIntent
@@ -212,15 +221,15 @@ def predict(amount: float, slippage: float = typer.Option(config.DEFAULT_SLIPPAG
     shadow = _shadow()
     intent = SwapIntent(amount, token_in=token_in, slippage=slippage)
     sel = DefenseSelector(chain, RiskEngine(chain, shadow))
-    selection = sel.evaluate(intent, mode="sim")
+    selection = sel.evaluate(intent, mode=mode.value, require_verification=verify)
     r = selection.report
     head = Table.grid(padding=(0, 2))
     head.add_row("trade", f"{amount:,} {token_in}  (~${r.trade_usd:,.0f})")
     head.add_row("if sent public", f"[red]harm ${r.harm_public_usd:,.2f}[/red], "
-                 f"attacker profit ${r.attacker_profit_usd:,.2f}, P(attack)={r.p_attack:.0%}")
-    head.add_row("hint leakage", f"harm ${r.harm_hint_usd:,.2f}")
-    head.add_row("closed-form check", f"${r.closed_form_harm_usd:,.2f}  (error {r.closed_form_error_pct:.2f} %)")
-    head.add_row("simulation", f"{r.sim_ms:.0f} ms, {r.evals} counterfactual evals")
+                 f"conditional profitability score={r.p_attack:.0%}")
+    head.add_row("risk source", selection.extra["risk_source"])
+    head.add_row("verification", selection.extra["verification"])
+    head.add_row("decision work", f"{selection.extra['decision_ms']:.0f} ms, {selection.extra['shadow_bundles']} shadow bundles")
     console.print(Panel(head, title=f"prediction for {amount:,} {token_in}"))
 
     t = Table(title="defense options  (J = harm + gas + latency + revert-risk, all in USD)")
@@ -375,6 +384,16 @@ def ml_quote(amount: float, slippage: float = .01,
     from .defense import HarmPredictor
     model = HarmPredictor.load() if HarmPredictor.available() else None
     console.print(json.dumps(assess_mainnet(pool, amount, slippage, model=model), indent=2))
+
+
+@app.command("benchmark-hybrid")
+def benchmark_hybrid(quick: bool = True, repeats: int = typer.Option(1,min=1,max=5)):
+    """Paired simulation/hybrid/analytic selection and actual attacked EVM execution."""
+    from .hybrid_benchmark import run_comparison
+    import json
+    report=run_comparison(_chain(),_shadow(),quick=quick,repeats=repeats,log=console.print)
+    console.print_json(json.dumps(report["summary"]))
+    console.print("Evidence: data/hybrid-benchmark.json; isolated receipts are reverted after measurement.")
 
 
 @app.command()

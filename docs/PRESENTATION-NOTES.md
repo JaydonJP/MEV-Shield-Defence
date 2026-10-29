@@ -264,6 +264,20 @@ A preview binds the sender, target, value, calldata, nonce, chain and fee fields
 
 Full dataset provenance, assumptions, commands and research references: [REAL-MARKET-ML.md](REAL-MARKET-ML.md). The earlier synthetic-only measurements remain historical validation evidence, not the current model card.
 
+### 18. Hybrid ML-assisted defense selection
+
+**Say:** “Previously the model produced dashboard labels while the selector still simulated everything. Now ML estimates public risk first and those estimates enter the same cost model used to choose protection. If the model is uncertain, the trade is large, or the defense costs are too close, we use the shadow fork. We also verify a selected tighter price limit or split, then re-rank if its measured cost changes.”
+
+**Show:** In the attack lab choose “ML + selective shadow verification”, preview a small trade, and inspect its source and shadow bundle count. Switch to simulation-only for comparison. A larger or out-of-support trade demonstrates automatic verification. At `/safety`, read the paired benchmark rather than comparing two unrelated runs by eye.
+
+**Explain the experiment:** “Every mode starts from the same saved state and executes its chosen defense against the same bot. We compare actual losses, reverts and user cost, as well as end-to-end decision latency and shadow-fork work. A reverted swap is not declared safe just because it lost zero tokens. We also include the faster analytic baseline, because this narrow V2 problem already has useful arithmetic.”
+
+**Research objective:** “Can ML-assisted defense selection provide comparable protection to simulation-based selection while reducing decision latency and computational work?”
+
+**Measured expanded run:** “Across 20 scenarios repeated twice, both selected policies produced zero protected-trade loss and no reverts, with the same realized user cost. Hybrid used 75% fewer shadow bundles and 68.44% less total decision time. These were warm local measurements; cold model loading took about 5.77 seconds, and the analytic control was faster still.”
+
+The latest measured results and their limits are in [HYBRID-SELECTION.md](HYBRID-SELECTION.md). The complete updated numbered implementation list is [IMPLEMENTED-FEATURES.md](IMPLEMENTED-FEATURES.md).
+
 ## Suggested 8–10 minute presentation
 
 | Time | Show and explain |
