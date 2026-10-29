@@ -6,7 +6,7 @@ from __future__ import annotations
 from .. import config
 from ..chain import Chain, account
 
-PAUSABLE = ("vulnerable", "safe", "vulnerableDAO", "snapshotDAO")
+PAUSABLE = ("vulnerable", "safe", "vulnerableDAO", "snapshotDAO", "firewall")
 
 
 class Responder:

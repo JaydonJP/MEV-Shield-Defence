@@ -16,13 +16,31 @@ from urllib.parse import urlsplit
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .engine import DemoEngine
 from ..chain.public import PublicNetwork
 
 STATIC = Path(__file__).resolve().parent / "static"
+
+
+class FeatureInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    amount: float | None = Field(default=None, gt=0, le=100000)
+
+
+class ReplayInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    amount_usdc: float = Field(default=10000, ge=1, le=100000)
+    liquidity_scale: float = Field(default=1, ge=.05, le=20)
+    slippage: float = Field(default=.02, ge=.00001, le=.2)
+    attacker_capital_usdc: float = Field(default=50000, ge=0, le=5000000)
+    gas_gwei: float = Field(default=2, ge=.01, le=200)
+    guardian_delay_blocks: int = Field(default=0, ge=0, le=5, strict=True)
+    attacker_tip_gwei: float = Field(default=1, ge=0, le=200)
+    guardian_tip_gwei: float = Field(default=2, ge=0, le=200)
+    seed: int = Field(default=42, ge=0, le=2**32 - 1, strict=True)
 
 
 class Broadcaster:
@@ -215,6 +233,44 @@ def create_app() -> FastAPI:
     @app.get("/")
     async def index():
         return FileResponse(STATIC / "index.html")
+
+    @app.get("/lab")
+    async def lab():
+        return FileResponse(STATIC / "lab.html")
+
+    @app.post("/api/extensions/{feature}")
+    async def extension(feature: Literal["routing", "cashback", "batch", "firewall", "coordinated", "all"],
+                        body: FeatureInput):
+        if feature == "all" and body.amount is not None:
+            raise HTTPException(422, "all uses scenario-specific defaults")
+        result = await _run(engine.run_extension, feature, body.amount)
+        return JSONResponse(result, status_code=400 if "error" in result else 200)
+
+    @app.post("/api/replay")
+    async def replay(body: ReplayInput):
+        from ..extensions.replay import Scenario, run_replay
+        return await asyncio.to_thread(run_replay, Scenario(**body.model_dump()))
+
+    @app.post("/api/replays")
+    async def save_scenario(body: ReplayInput):
+        from ..extensions.replay import Scenario, save_replay
+        return await asyncio.to_thread(save_replay, Scenario(**body.model_dump()))
+
+    @app.get("/api/replays")
+    async def saved_scenarios():
+        from ..extensions.replay import list_replays
+        return await asyncio.to_thread(list_replays)
+
+    @app.get("/api/replays/{replay_id}")
+    async def saved_replay(replay_id: str):
+        from ..extensions.replay import load_replay, run_replay
+        try:
+            scenario = await asyncio.to_thread(load_replay, replay_id)
+        except FileNotFoundError:
+            raise HTTPException(404, "replay not found")
+        except ValueError as exc:
+            raise HTTPException(422, str(exc))
+        return await asyncio.to_thread(run_replay, scenario)
 
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
     return app

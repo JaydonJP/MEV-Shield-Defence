@@ -18,6 +18,21 @@ block, ordered *before* an attack, so the attack reverts.
 
 See [PLAN.md](PLAN.md) for the full design and [docs/REPORT.md](docs/REPORT.md) for the write-up.
 
+## Research extensions
+
+The project now also includes **MEV-aware multi-pool routing, funded backrun cashback auctions,
+two-order batch matching, an on-chain lending firewall, coordinated transaction detection, and a
+reproducible attack replay lab**. Open **http://127.0.0.1:8000/lab** after starting the server.
+
+```powershell
+.venv\Scripts\python.exe -m mevshield.cli extensions run all
+.venv\Scripts\python.exe -m mevshield.cli extensions replay --save
+```
+
+The first command runs isolated EVM-backed experiments and writes `data/extensions-results.json`;
+the second runs an offline analytical comparison. See **[docs/EXTENSIONS.md](docs/EXTENSIONS.md)**
+for individual commands, architecture, APIs, tests and the limits of each implementation.
+
 ---
 
 ## Threats covered
@@ -42,7 +57,7 @@ Prerequisites: **Python 3.12** and **Foundry** (anvil + forge).
 
 # 2. Python environment
 py -V:Astral/CPython3.12.13 -m venv .venv      # or: python3.12 -m venv .venv
-.venv\Scripts\pip install -e .
+.venv\Scripts\pip install -e ".[dev]"
 
 # 3. (optional) run the test suites
 cd contracts && forge test && cd ..            # 29 Solidity tests

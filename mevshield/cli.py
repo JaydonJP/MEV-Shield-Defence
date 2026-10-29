@@ -32,6 +32,8 @@ attack_app = typer.Typer(help="Launch a test-harness attack.")
 app.add_typer(attack_app, name="attack")
 guardian_app = typer.Typer(help="Protocol-side mempool guardian.")
 app.add_typer(guardian_app, name="guardian")
+extensions_app = typer.Typer(help="Routing, cashback, batching, firewall, coordinated detection and replay.")
+app.add_typer(extensions_app, name="extensions")
 
 console = Console()
 if sys.platform == "win32":
@@ -430,6 +432,53 @@ def _print_block(blk):
         t.add_row(str(i), tx.hash[:10], tx.sender_role or (tx.sender[:8]), tx.fn, f"{tx.tip_gwei:.1f}", ok,
                   flags, style=style)
     console.print(t)
+
+
+@extensions_app.command("run")
+def extensions_run(feature: str, amount: float | None = typer.Option(None)):
+    """Run routing|cashback|batch|firewall|coordinated, or all (isolated comparative suite)."""
+    import json
+    from .extensions.service import run_feature, run_suite
+    chain = _chain()
+    shadow = _shadow()
+    if feature == "all" and amount is not None:
+        raise typer.BadParameter("all uses scenario-specific default amounts")
+    try:
+        result = run_suite(chain, shadow) if feature == "all" else run_feature(chain, shadow, feature, amount)
+    except (ValueError, RuntimeError) as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1)
+    console.print_json(json.dumps(result))
+
+
+@extensions_app.command("scan")
+def extensions_scan():
+    """Analyze the current pending set as related sequences without mining it."""
+    import json
+    from .extensions.coordinated import analyze_sequences
+    chain = _chain()
+    console.print_json(json.dumps(analyze_sequences(chain, _shadow(), chain.txpool())))
+
+
+@extensions_app.command("replay")
+def extensions_replay(amount: float = 10000, liquidity: float = 1, slippage: float = .02,
+                      capital: float = 50000, gas: float = 2, delay: int = 0, seed: int = 42,
+                      save: bool = False, replay_id: str | None = None, guardian_tip: float = 2):
+    """Compare deterministic AMM-model scenarios offline; optionally save/load an immutable scenario."""
+    import json
+    from .extensions.replay import Scenario, load_replay, run_replay, save_replay
+    try:
+        scenario = load_replay(replay_id) if replay_id else Scenario(
+            amount_usdc=amount, liquidity_scale=liquidity, slippage=slippage,
+            attacker_capital_usdc=capital, gas_gwei=gas, guardian_delay_blocks=delay, seed=seed,
+            guardian_tip_gwei=guardian_tip)
+        result = run_replay(scenario)
+        if save:
+            result["saved"] = save_replay(scenario)
+    except (ValueError, FileNotFoundError) as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1)
+    console.print_json(json.dumps(result))
 
 
 if __name__ == "__main__":

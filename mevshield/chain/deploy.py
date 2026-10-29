@@ -77,6 +77,13 @@ def _deploy_all(chain: Chain, log) -> dict:
     mint(usdc, a["safe"], config.LENDING_LIQUIDITY)
     a["router"] = _deploy(chain, admin, "ProtectedRouter")
     a["commitReveal"] = _deploy(chain, admin, "CommitRevealSwap")
+    a["mevRouter"] = _deploy(chain, admin, "MEVRouter")
+    a["batch"] = _deploy(chain, admin, "BatchSettlement", a["ammA"], 1)
+    a["cashback"] = _deploy(chain, admin, "CashbackAuction", a["WETH"], a["USDC"])
+    a["firewall"] = _deploy(chain, admin, "FirewallLending", a["WETH"], a["USDC"], a["ammA"],
+                            guardian, a["oracle"], config.SAFE_MAX_DEVIATION_BPS,
+                            10_000 * config.E, 25_000 * config.E, 10)
+    mint(usdc, a["firewall"], config.LENDING_LIQUIDITY)
     a["vulnerableDAO"] = _deploy(chain, admin, "VulnerableDAO", a["GOV"], guardian)
     a["snapshotDAO"] = _deploy(chain, admin, "SnapshotDAO", a["GOV"], guardian)
     mint(usdc, a["vulnerableDAO"], config.DAO_TREASURY)
@@ -88,10 +95,14 @@ def _deploy_all(chain: Chain, log) -> dict:
         acct = account(role)
         mint(usdc, acct.address, config.USER_FUNDS["USDC"])
         mint(weth, acct.address, config.USER_FUNDS["WETH"])
-        for spender in ("router", "commitReveal", "vulnerable", "safe", "ammA", "ammB"):
+        for spender in ("router", "commitReveal", "vulnerable", "safe", "ammA", "ammB",
+                        "mevRouter", "batch", "cashback", "firewall"):
             chain.transact(acct, usdc.functions.approve(a[spender], MAX))
             chain.transact(acct, weth.functions.approve(a[spender], MAX))
     mint(gov, account("bob").address, config.GOV_SUPPLY_HOLDERS)
+    for role in ("arbitrageur", "relay"):
+        mint(usdc, account(role).address, 100_000 * config.E)
+        chain.transact(account(role), usdc.functions.approve(a["cashback"], MAX))
 
     # test-harness contracts (owned by their attacker accounts)
     a["flashArb"] = _deploy(chain, account("arbitrageur"), "FlashArbitrage", a["lender"])

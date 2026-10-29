@@ -23,6 +23,9 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8", "httpx>=0.27,<1"]
 
+[tool.pytest.ini_options]
+markers = ["integration: requires the deployed local main and shadow Anvil nodes"]
+
 [project.scripts]
 mevshield = "mevshield.cli:app"
 
