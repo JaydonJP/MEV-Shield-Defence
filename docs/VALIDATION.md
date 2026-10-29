@@ -1,5 +1,8 @@
 # Integration validation
 
+**30 October 2026 update:** The current shipped model and read-only mainnet assessment are documented in [REAL-MARKET-ML.md](REAL-MARKET-ML.md). The synthetic-only training/results below describe the earlier implementation. `mevshield train` now uses the real-context pipeline; `--synthetic` explicitly selects the legacy lab trainer.
+
+
 Validated locally on **29 October 2026**, using Python 3.12, Solidity 0.8.24 and the installed Foundry tools. The friend's extension commit `157d173` is included in the Git history, together with the preserved Sepolia/dashboard work.
 
 ## Results
@@ -48,3 +51,16 @@ An explicit 4,000-sample, seed-0 training run produced harm R² **0.9723**, clas
 - Verification timeout/compile failure cannot be counted as a successfully detected mutant.
 
 There are two upstream deprecation warnings from websockets and the installed Starlette/httpx compatibility path. They did not cause test failures. No public-network transaction, real-wallet signature or mainnet profitability claim is part of this validation. The original Guardian cash-loss proxy and simplified oracle limitations are documented in the presentation notes; this change does not claim to resolve proposal items 1–7 wholesale.
+
+
+## Real-context ML validation — 30 October 2026
+
+- Full Python suite with `MEVSHIELD_INTEGRATION=1` and a fresh workspace `--basetemp`: **97 passed**, including the existing 11 local EVM integration cases. The system temp directory initially denied access; using a fresh workspace temp directory resolved the setup errors. No model assertions failed.
+- Twelve new checks cover real event/reserve reconstruction for both directions/token orders, decimals, explicit policy provenance, block-hash mismatches, nonstandard swaps, RPC write rejection, whole-block splits and deterministic policy descendants, exclusion of outcome features, ETH-price sensitivity, factory/token checks, API boundaries, bundled dataset/model checksums and qualified-model loading/fallback.
+- All seven cached collection windows were reconstructed with transaction/header/log hash consistency checks. Every per-window dataset SHA-256 and the combined input digest matched the committed dataset.
+- A live read-only smoke test at Ethereum block 26,300,484 succeeded for all four supported pools: three used accepted ML estimates, SushiSwap used exact V2 fallback. No transaction was signed or broadcast.
+- Local actual EVM checks at 1,000/10,000/100,000 USDC returned ML/ML/simulator respectively. At the recorded state, EVM harms were $19.89/$190.52/$1,339.49. The last fallback matched the EVM exactly. Main-chain reserves and block height remained unchanged. These are smoke cases, not a new independent accuracy benchmark.
+- Wallet JavaScript regression checks: **8 passed**. Updated safety JavaScript passed `node --check`.
+- A wheel build succeeded and includes the compressed model and model card. The real-context data, frozen metrics, undefined observed-traffic recall and assumptions are detailed in [REAL-MARKET-ML.md](REAL-MARKET-ML.md).
+
+Browser automation was unavailable for the final visual check. HTTP/API and JavaScript checks cover the new interface behavior; no screenshot-level validation is claimed. Solidity sources did not change in this upgrade, so the earlier Foundry evidence remains the relevant contract verification run.

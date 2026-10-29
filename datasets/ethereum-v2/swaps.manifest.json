@@ -1,0 +1,449 @@
+{
+  "sources": [
+    {
+      "schema": "v2-counterfactual-2",
+      "collected_at": 1793301620.8002965,
+      "chain_id": 1,
+      "start_block": 26270301,
+      "end_block": 26300300,
+      "pools": {
+        "0xb4e16d0168e52d35cacd2c6185b44281ec28c9dc": {
+          "name": "Uniswap V2 USDC/WETH",
+          "stable": "USDC",
+          "decimals": 6,
+          "stable0": true,
+          "router": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d"
+        },
+        "0xa478c2975ab1ea89e8196811f51a7b7ade33eb11": {
+          "name": "Uniswap V2 DAI/WETH",
+          "stable": "DAI",
+          "decimals": 18,
+          "stable0": true,
+          "router": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d"
+        },
+        "0x0d4a11d5eeaac28ec3f61d100daf4d40471f1852": {
+          "name": "Uniswap V2 WETH/USDT",
+          "stable": "USDT",
+          "decimals": 6,
+          "stable0": false,
+          "router": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d"
+        },
+        "0x397ff1542f962076d0bfe58ea045ffa2d347aca0": {
+          "name": "SushiSwap USDC/WETH",
+          "stable": "USDC",
+          "decimals": 6,
+          "stable0": true,
+          "router": "0xd9e1ce17f2641f24ae83637ab66a2cca9c378b9f"
+        }
+      },
+      "rows": 4380,
+      "source": "public Ethereum JSON-RPC",
+      "dataset_sha256": "f8217ae13e567f522bf8d81a7ce833da1cf7386d8faef2a283e108c4656e5b7e",
+      "rejected": {
+        "nonstandard_fee_or_token": 1761,
+        "unsupported_swap_shape": 1,
+        "complex_pool_transaction": 57,
+        "outside_slippage_scope": 624
+      },
+      "slippage_sources": {
+        "declared_policy_scenario": 4277,
+        "decoded_router_minimum": 103
+      },
+      "label_kind": "mathematical counterfactual, not observed sandwich occurrence",
+      "assumptions": {
+        "capital_usd": 5000000,
+        "attacker_gas_units": 420000,
+        "stablecoin_usd": 1,
+        "pool_model": "V2 constant product, 30 bps",
+        "policy_slippage_if_undecodable": [
+          0.001,
+          0.005,
+          0.01,
+          0.02,
+          0.05
+        ]
+      },
+      "path": "data\\mainnet\\swaps.csv"
+    },
+    {
+      "schema": "v2-counterfactual-2",
+      "collected_at": 1793301458.759532,
+      "chain_id": 1,
+      "start_block": 19474501,
+      "end_block": 19476000,
+      "pools": {
+        "0xb4e16d0168e52d35cacd2c6185b44281ec28c9dc": {
+          "name": "Uniswap V2 USDC/WETH",
+          "stable": "USDC",
+          "decimals": 6,
+          "stable0": true,
+          "router": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d"
+        },
+        "0xa478c2975ab1ea89e8196811f51a7b7ade33eb11": {
+          "name": "Uniswap V2 DAI/WETH",
+          "stable": "DAI",
+          "decimals": 18,
+          "stable0": true,
+          "router": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d"
+        },
+        "0x0d4a11d5eeaac28ec3f61d100daf4d40471f1852": {
+          "name": "Uniswap V2 WETH/USDT",
+          "stable": "USDT",
+          "decimals": 6,
+          "stable0": false,
+          "router": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d"
+        },
+        "0x397ff1542f962076d0bfe58ea045ffa2d347aca0": {
+          "name": "SushiSwap USDC/WETH",
+          "stable": "USDC",
+          "decimals": 6,
+          "stable0": true,
+          "router": "0xd9e1ce17f2641f24ae83637ab66a2cca9c378b9f"
+        }
+      },
+      "rows": 1950,
+      "source": "public Ethereum JSON-RPC",
+      "dataset_sha256": "2451f564d082de46926e49ab641940139f85f5c354e9eb32d1d4ccaf09ba3469",
+      "rejected": {
+        "nonstandard_fee_or_token": 47,
+        "complex_pool_transaction": 7
+      },
+      "slippage_sources": {
+        "declared_policy_scenario": 1946,
+        "decoded_router_minimum": 4
+      },
+      "label_kind": "mathematical counterfactual, not observed sandwich occurrence",
+      "assumptions": {
+        "capital_usd": 5000000,
+        "attacker_gas_units": 420000,
+        "stablecoin_usd": 1,
+        "pool_model": "V2 constant product, 30 bps",
+        "policy_slippage_if_undecodable": [
+          0.001,
+          0.005,
+          0.01,
+          0.02,
+          0.05
+        ]
+      },
+      "path": "data\\historical\\19476000\\swaps.csv"
+    },
+    {
+      "schema": "v2-counterfactual-2",
+      "collected_at": 1793301467.3799837,
+      "chain_id": 1,
+      "start_block": 20498501,
+      "end_block": 20500000,
+      "pools": {
+        "0xb4e16d0168e52d35cacd2c6185b44281ec28c9dc": {
+          "name": "Uniswap V2 USDC/WETH",
+          "stable": "USDC",
+          "decimals": 6,
+          "stable0": true,
+          "router": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d"
+        },
+        "0xa478c2975ab1ea89e8196811f51a7b7ade33eb11": {
+          "name": "Uniswap V2 DAI/WETH",
+          "stable": "DAI",
+          "decimals": 18,
+          "stable0": true,
+          "router": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d"
+        },
+        "0x0d4a11d5eeaac28ec3f61d100daf4d40471f1852": {
+          "name": "Uniswap V2 WETH/USDT",
+          "stable": "USDT",
+          "decimals": 6,
+          "stable0": false,
+          "router": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d"
+        },
+        "0x397ff1542f962076d0bfe58ea045ffa2d347aca0": {
+          "name": "SushiSwap USDC/WETH",
+          "stable": "USDC",
+          "decimals": 6,
+          "stable0": true,
+          "router": "0xd9e1ce17f2641f24ae83637ab66a2cca9c378b9f"
+        }
+      },
+      "rows": 867,
+      "source": "public Ethereum JSON-RPC",
+      "dataset_sha256": "d1d72110b7b463653f91f53012a856ae1115894bae7d286552a05b87744981ef",
+      "rejected": {
+        "nonstandard_fee_or_token": 47,
+        "complex_pool_transaction": 2
+      },
+      "slippage_sources": {
+        "declared_policy_scenario": 865,
+        "decoded_router_minimum": 2
+      },
+      "label_kind": "mathematical counterfactual, not observed sandwich occurrence",
+      "assumptions": {
+        "capital_usd": 5000000,
+        "attacker_gas_units": 420000,
+        "stablecoin_usd": 1,
+        "pool_model": "V2 constant product, 30 bps",
+        "policy_slippage_if_undecodable": [
+          0.001,
+          0.005,
+          0.01,
+          0.02,
+          0.05
+        ]
+      },
+      "path": "data\\historical\\20500000\\swaps.csv"
+    },
+    {
+      "schema": "v2-counterfactual-2",
+      "collected_at": 1793301484.774809,
+      "chain_id": 1,
+      "start_block": 21498501,
+      "end_block": 21500000,
+      "pools": {
+        "0xb4e16d0168e52d35cacd2c6185b44281ec28c9dc": {
+          "name": "Uniswap V2 USDC/WETH",
+          "stable": "USDC",
+          "decimals": 6,
+          "stable0": true,
+          "router": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d"
+        },
+        "0xa478c2975ab1ea89e8196811f51a7b7ade33eb11": {
+          "name": "Uniswap V2 DAI/WETH",
+          "stable": "DAI",
+          "decimals": 18,
+          "stable0": true,
+          "router": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d"
+        },
+        "0x0d4a11d5eeaac28ec3f61d100daf4d40471f1852": {
+          "name": "Uniswap V2 WETH/USDT",
+          "stable": "USDT",
+          "decimals": 6,
+          "stable0": false,
+          "router": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d"
+        },
+        "0x397ff1542f962076d0bfe58ea045ffa2d347aca0": {
+          "name": "SushiSwap USDC/WETH",
+          "stable": "USDC",
+          "decimals": 6,
+          "stable0": true,
+          "router": "0xd9e1ce17f2641f24ae83637ab66a2cca9c378b9f"
+        }
+      },
+      "rows": 687,
+      "source": "public Ethereum JSON-RPC",
+      "dataset_sha256": "61de7e4b5cea5ffbcf86bb470f413534174cdf53727737b64ea24effa3a606b9",
+      "rejected": {
+        "nonstandard_fee_or_token": 10
+      },
+      "slippage_sources": {
+        "declared_policy_scenario": 686,
+        "decoded_router_minimum": 1
+      },
+      "label_kind": "mathematical counterfactual, not observed sandwich occurrence",
+      "assumptions": {
+        "capital_usd": 5000000,
+        "attacker_gas_units": 420000,
+        "stablecoin_usd": 1,
+        "pool_model": "V2 constant product, 30 bps",
+        "policy_slippage_if_undecodable": [
+          0.001,
+          0.005,
+          0.01,
+          0.02,
+          0.05
+        ]
+      },
+      "path": "data\\historical\\21500000\\swaps.csv"
+    },
+    {
+      "schema": "v2-counterfactual-2",
+      "collected_at": 1793301647.584203,
+      "chain_id": 1,
+      "start_block": 22498501,
+      "end_block": 22500000,
+      "pools": {
+        "0xb4e16d0168e52d35cacd2c6185b44281ec28c9dc": {
+          "name": "Uniswap V2 USDC/WETH",
+          "stable": "USDC",
+          "decimals": 6,
+          "stable0": true,
+          "router": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d"
+        },
+        "0xa478c2975ab1ea89e8196811f51a7b7ade33eb11": {
+          "name": "Uniswap V2 DAI/WETH",
+          "stable": "DAI",
+          "decimals": 18,
+          "stable0": true,
+          "router": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d"
+        },
+        "0x0d4a11d5eeaac28ec3f61d100daf4d40471f1852": {
+          "name": "Uniswap V2 WETH/USDT",
+          "stable": "USDT",
+          "decimals": 6,
+          "stable0": false,
+          "router": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d"
+        },
+        "0x397ff1542f962076d0bfe58ea045ffa2d347aca0": {
+          "name": "SushiSwap USDC/WETH",
+          "stable": "USDC",
+          "decimals": 6,
+          "stable0": true,
+          "router": "0xd9e1ce17f2641f24ae83637ab66a2cca9c378b9f"
+        }
+      },
+      "rows": 1271,
+      "source": "public Ethereum JSON-RPC",
+      "dataset_sha256": "91f31f6ac73d0e79bd86230c4c5fa51dc5824edebeba99c2e27a49ed8f037d7d",
+      "rejected": {
+        "nonstandard_fee_or_token": 113,
+        "outside_slippage_scope": 1,
+        "complex_pool_transaction": 22
+      },
+      "slippage_sources": {
+        "declared_policy_scenario": 1267,
+        "decoded_router_minimum": 4
+      },
+      "label_kind": "mathematical counterfactual, not observed sandwich occurrence",
+      "assumptions": {
+        "capital_usd": 5000000,
+        "attacker_gas_units": 420000,
+        "stablecoin_usd": 1,
+        "pool_model": "V2 constant product, 30 bps",
+        "policy_slippage_if_undecodable": [
+          0.001,
+          0.005,
+          0.01,
+          0.02,
+          0.05
+        ]
+      },
+      "path": "data\\historical\\22500000\\swaps.csv"
+    },
+    {
+      "schema": "v2-counterfactual-2",
+      "collected_at": 1793301665.887136,
+      "chain_id": 1,
+      "start_block": 23498501,
+      "end_block": 23500000,
+      "pools": {
+        "0xb4e16d0168e52d35cacd2c6185b44281ec28c9dc": {
+          "name": "Uniswap V2 USDC/WETH",
+          "stable": "USDC",
+          "decimals": 6,
+          "stable0": true,
+          "router": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d"
+        },
+        "0xa478c2975ab1ea89e8196811f51a7b7ade33eb11": {
+          "name": "Uniswap V2 DAI/WETH",
+          "stable": "DAI",
+          "decimals": 18,
+          "stable0": true,
+          "router": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d"
+        },
+        "0x0d4a11d5eeaac28ec3f61d100daf4d40471f1852": {
+          "name": "Uniswap V2 WETH/USDT",
+          "stable": "USDT",
+          "decimals": 6,
+          "stable0": false,
+          "router": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d"
+        },
+        "0x397ff1542f962076d0bfe58ea045ffa2d347aca0": {
+          "name": "SushiSwap USDC/WETH",
+          "stable": "USDC",
+          "decimals": 6,
+          "stable0": true,
+          "router": "0xd9e1ce17f2641f24ae83637ab66a2cca9c378b9f"
+        }
+      },
+      "rows": 850,
+      "source": "public Ethereum JSON-RPC",
+      "dataset_sha256": "f26a4c739a67b5e9488f4bbb5f7dbcfe92d38493229640984f2463d53a3b11d9",
+      "rejected": {
+        "nonstandard_fee_or_token": 95,
+        "complex_pool_transaction": 15
+      },
+      "slippage_sources": {
+        "declared_policy_scenario": 849,
+        "decoded_router_minimum": 1
+      },
+      "label_kind": "mathematical counterfactual, not observed sandwich occurrence",
+      "assumptions": {
+        "capital_usd": 5000000,
+        "attacker_gas_units": 420000,
+        "stablecoin_usd": 1,
+        "pool_model": "V2 constant product, 30 bps",
+        "policy_slippage_if_undecodable": [
+          0.001,
+          0.005,
+          0.01,
+          0.02,
+          0.05
+        ]
+      },
+      "path": "data\\historical\\23500000\\swaps.csv"
+    },
+    {
+      "schema": "v2-counterfactual-2",
+      "collected_at": 1793301681.179993,
+      "chain_id": 1,
+      "start_block": 24498501,
+      "end_block": 24500000,
+      "pools": {
+        "0xb4e16d0168e52d35cacd2c6185b44281ec28c9dc": {
+          "name": "Uniswap V2 USDC/WETH",
+          "stable": "USDC",
+          "decimals": 6,
+          "stable0": true,
+          "router": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d"
+        },
+        "0xa478c2975ab1ea89e8196811f51a7b7ade33eb11": {
+          "name": "Uniswap V2 DAI/WETH",
+          "stable": "DAI",
+          "decimals": 18,
+          "stable0": true,
+          "router": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d"
+        },
+        "0x0d4a11d5eeaac28ec3f61d100daf4d40471f1852": {
+          "name": "Uniswap V2 WETH/USDT",
+          "stable": "USDT",
+          "decimals": 6,
+          "stable0": false,
+          "router": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d"
+        },
+        "0x397ff1542f962076d0bfe58ea045ffa2d347aca0": {
+          "name": "SushiSwap USDC/WETH",
+          "stable": "USDC",
+          "decimals": 6,
+          "stable0": true,
+          "router": "0xd9e1ce17f2641f24ae83637ab66a2cca9c378b9f"
+        }
+      },
+      "rows": 498,
+      "source": "public Ethereum JSON-RPC",
+      "dataset_sha256": "d659cb6a2fc0aecfe204cbf05bfbcfc57dcfa0a4b733a216479d56acf2977c5d",
+      "rejected": {
+        "nonstandard_fee_or_token": 282,
+        "complex_pool_transaction": 11
+      },
+      "slippage_sources": {
+        "declared_policy_scenario": 495,
+        "decoded_router_minimum": 3
+      },
+      "label_kind": "mathematical counterfactual, not observed sandwich occurrence",
+      "assumptions": {
+        "capital_usd": 5000000,
+        "attacker_gas_units": 420000,
+        "stablecoin_usd": 1,
+        "pool_model": "V2 constant product, 30 bps",
+        "policy_slippage_if_undecodable": [
+          0.001,
+          0.005,
+          0.01,
+          0.02,
+          0.05
+        ]
+      },
+      "path": "data\\historical\\24500000\\swaps.csv"
+    }
+  ],
+  "rows": 10503,
+  "dataset_sha256": "efb25a1cbe7c766528c03a63c97f27e1c8263467c9301ce33049943db0387901"
+}

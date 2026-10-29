@@ -1,4 +1,7 @@
-"""Fast ML predictor of sandwich risk (< 1 ms), trained on simulated attack scenarios.
+"""Legacy synthetic predictor and compatible loader for the real-context model.
+
+The current real-context training/evaluation pipeline lives in mevshield.ml.
+The original lab-only implementation remains available with train --synthetic.
 
 Why a model at all? The counterfactual shadow-fork simulator is the source of truth but costs ~100s of ms
 per transaction — too slow to label every pending transaction in the mempool live. So we distil the
@@ -254,8 +257,24 @@ class HarmPredictor:
     @classmethod
     def load(cls, path=config.MODEL_FILE) -> "HarmPredictor":
         inst = cls()
-        with open(path, "rb") as fh:
+        from pathlib import Path
+        from ..ml.model import BUNDLED
+        if path == config.MODEL_FILE and BUNDLED.exists():
+            if not Path(path).exists() or BUNDLED.stat().st_mtime > Path(path).stat().st_mtime:
+                path = BUNDLED
+        if Path(path).resolve() == BUNDLED.resolve():
+            import hashlib, json
+            card = json.loads(BUNDLED.with_suffix(".json").read_text())
+            if hashlib.sha256(BUNDLED.read_bytes()).hexdigest() != card["artifact_sha256"]:
+                raise ValueError("Bundled model checksum mismatch; restore the trusted artifact or retrain")
+        import gzip
+        with open(path, "rb") as header:
+            compressed = header.read(2) == b"\x1f\x8b"
+        with (gzip.open(path, "rb") if compressed else open(path, "rb")) as fh:
             blob = pickle.load(fh)
+        if blob.get("format") == "market-risk-v1":
+            from ..ml.model import MarketRiskPredictor
+            return MarketRiskPredictor.from_blob(blob)
         inst.reg, inst.clf, inst.metrics = blob["reg"], blob["clf"], blob["metrics"]
         inst.calibration = blob.get("calibration")
         inst.domain = blob.get("domain")
@@ -264,7 +283,8 @@ class HarmPredictor:
 
     @classmethod
     def available(cls) -> bool:
-        return config.MODEL_FILE.exists()
+        from ..ml.model import BUNDLED
+        return config.MODEL_FILE.exists() or BUNDLED.exists()
 
     def metrics_dict(self) -> dict:
         return asdict(self.metrics) if self.metrics else {}

@@ -30,6 +30,7 @@ class DemoEngine:
         self.chain: Chain | None = None
         self.shadow: ShadowFork | None = None
         self.model: HarmPredictor | None = None
+        self._model_stamp = None
         self._busy = False
         self._action_lock = threading.Lock()
         self.safety = None
@@ -58,8 +59,11 @@ class DemoEngine:
             self.shadow = ShadowFork(self.chain)
             from ..defense.safety import SafetyReports
             self.safety = SafetyReports(self.chain, self.shadow)
-        if self.model is None and HarmPredictor.available():
+        from ..ml.model import BUNDLED
+        stamp = tuple(p.stat().st_mtime_ns if p.exists() else None for p in (config.MODEL_FILE, BUNDLED))
+        if (self.model is None or self._model_stamp != stamp) and HarmPredictor.available():
             self.model = HarmPredictor.load()
+            self._model_stamp = stamp
         return True
 
     # ------------------------------------------------------------------- state
@@ -166,8 +170,14 @@ class DemoEngine:
             except Exception:
                 return {"harm_usd": None, "p_attack": None, "source": "none", "status": "unknown",
                         "accepted": False, "reasons": ["Neither model nor simulator is available"]}
+        from ..ml.model import MarketRiskPredictor
+        options = {}
+        if isinstance(self.model, MarketRiskPredictor):
+            r0, r1 = self.chain.reserves("ammA")
+            options = {"eth_price_usd": r1 / r0, "domain": "lab"}
         return self.model.predict_with_fallback(amount, self._liquidity_usd(), slippage,
-            config.POOL_FEE_BPS, (self.chain.base_fee() + config.DEFAULT_TIP) / config.GWEI, simulator=simulate)
+            config.POOL_FEE_BPS, (self.chain.base_fee() + config.DEFAULT_TIP + config.GWEI) / config.GWEI,
+            simulator=simulate, **options)
 
     def risk_preview(self, amount, slippage):
         with self._guard():

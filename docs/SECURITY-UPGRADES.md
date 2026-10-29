@@ -1,5 +1,8 @@
 # Reliability upgrades 8, 9 and 10
 
+**30 October 2026 update:** The current shipped model and read-only mainnet assessment are documented in [REAL-MARKET-ML.md](REAL-MARKET-ML.md). The synthetic-only training/results below describe the earlier implementation. `mevshield train` now uses the real-context pipeline; `--synthetic` explicitly selects the legacy lab trainer.
+
+
 The six trading/security extensions from `bhuvang2026in/MEV-Shield-Defence` commit `157d173` are merged with the existing dashboard and Sepolia vault. This change adds the following previously absent capabilities.
 
 ## 8: stateful verification

@@ -242,21 +242,27 @@ A preview binds the sender, target, value, calldata, nonce, chain and fee fields
 
 **Limit:** The preview simulates the action alone; it is not sandwich protection and cannot promise future public-chain ordering. Public transactions use the separate wallet flow. Uncoordinated CLI/external writers must not run during the local experiment. Reset/isolation can remove a historical receipt from canonical local state.
 
-### 17. Upgrade 10: calibrated ML, abstention and fallback
+### 17. Upgrade 10: real-context ML, calibrated uncertainty and fallback
 
-**Say:** “A fast model should also tell us when it lacks enough evidence. We reserve separate samples for training, calibration and final testing.”
+**Say:** “We replaced synthetic-only training with a reproducible pipeline using 10,503 real Ethereum pool swap inputs from four pools. We added ETH price to the features because gas cost in dollars depends on it. We test on later blocks rather than randomly mixing market conditions.”
 
-The split is 60% training, 20% calibration and 20% test. The gradient-boosted harm model learns synthetic AMM outcomes. A separate logistic calibration maps classifier scores; scaled split-conformal residuals form a nominal 90% harm interval. The test set reports actual interval coverage and Brier score as well as existing accuracy metrics.
+**Explain the labels carefully:** “Real inputs are not the same as real attack labels. We observe actual swaps, reserves and gas. For user slippage we decode supported router calls when possible; otherwise we explicitly declare a policy. We then compute whether a bounded sandwich would be profitable. Most ordinary swaps are too small to be profitable in these liquid pools, so we also create clearly labelled size-policy stress cases using the real states.”
 
-The model abstains for inputs outside training support, unsupported fee tiers, wide intervals, uncertain classification or old artifacts without calibration. The live integration uses the actual pool's shadow fork as fallback. If fallback also fails, the result is unknown, not zero risk. The evidence records which source produced the final value.
+**Why stress cases:** Only 8 of the 10,503 observed inputs have positive counterfactual labels. The observed-size final holdout contains no positives, so an always-negative model would have 100% accuracy there. This is why we report the stress benchmark separately and do not claim observed-attack recall.
 
-**Show:** Assess a 10,000-USDC trade, inspect source/status/reasons. An uncertain model should visibly fall back to simulation. Then assess 100,000 USDC, which exceeds the synthetic training trade range. For model-only behavior inspect the unit tests and CLI metrics; do not fabricate a simulator outage during the presentation.
+**Architecture:** Compare histogram boosting and Extra Trees on validation only. The selected harm model learns loss as a fraction of trade value; the classifier learns conditional profitability. Thirteen economic features include trade/depth ratio, fee, slippage, gas dollars, ETH price and relative attacker capital. Identifiers, future blocks and realized attack outcomes are excluded.
 
-**Code:** `defense/predictor.py`, `DemoEngine._risk_report`, `/api/risk`.
+**Evaluation:** Source blocks split 60/15/10/15 into training, validation, calibration and test, with a boundary purge. Every policy case stays with its originating block. The frozen real-context policy test has 6,920 cases: 99.91% balanced accuracy, 99.96% recall, $3.23 harm MAE and 0.9998 harm R². A nominal 90% interval covers 89.15% of that holdout. The separate synthetic lab test has 900 cases: 97.91% balanced accuracy and 96.30% recall. A shuffled-label control gets 0.522 ROC-AUC, near chance. None of these is a measurement of real attackers appearing.
 
-**Example measured run:** With 4,000 synthetic samples and seed 0, R² was about 0.9723, held-out interval coverage 88.8%, and Brier score 0.0163. These are one local run's measurements; retraining can change them. 90% is a nominal target, not a promise of exactly 90% empirical coverage.
+**Show:** At `/safety`, expand “Training data and held-out evaluation”. Use the local risk form to inspect ML versus shadow-fork fallback. Then use “Assess a real pool” to read Ethereum reserves without a wallet. The response names the block, pool, assumptions and whether ML or explicit V2 economics produced the result. SushiSwap can demonstrate abstention without fabricating a failure. Changing live state can change which path is selected.
 
-**Limit:** These are synthetic same-model holdouts, not historical mainnet validation. Exchangeability can fail under drift. The classifier label concerns modeled profitable attack conditions, not the real-world frequency of an attacker appearing. A larger neural network is not automatically better evidence.
+**Uncertainty:** Calibrated scores, nominal intervals, support checks and uncertain-boundary checks control acceptance. Mainnet and lab support/interval calibration are separate. If ML declines a local case, the EVM shadow fork runs; for a real V2 quote, explicit pool economics runs. If live reads fail, no safe verdict is inferred.
+
+**If mam asks “Is it production ready?”:** “It is a working read-only tool for four specific V2 pools and a tested local protection lab. Its model estimates risk conditional on attacker capital, gas, order and price assumptions. Before autonomous real-fund protection we would need broader pools, independently labelled observed attacks, execution testing, independent price references, operational monitoring and security review.”
+
+**If mam asks “Why ML when V2 has a formula?”:** “For this narrow V2 calculation, the direct formula is faster: about 0.92 ms versus 8.04 ms for the harm regressor alone. We measured that and do not claim a speed advantage. ML provides a trained approximation with calibrated uncertainty and a reusable evaluation workflow; contract-level EVM simulation remains a different, broader check.”
+
+Full dataset provenance, assumptions, commands and research references: [REAL-MARKET-ML.md](REAL-MARKET-ML.md). The earlier synthetic-only measurements remain historical validation evidence, not the current model card.
 
 ## Suggested 8–10 minute presentation
 
@@ -288,7 +294,7 @@ For a short demonstration, pre-run the verification script. Keep the full notes 
 .venv\Scripts\python.exe scripts/verify_security.py
 
 # Optional explicit model retraining:
-.venv\Scripts\python.exe -m mevshield.cli train --samples 4000
+.venv\Scripts\python.exe -m mevshield.cli ml train --dataset datasets/ethereum-v2/swaps.csv
 
 # EVM integration checks need running main + shadow nodes:
 $env:MEVSHIELD_INTEGRATION = "1"

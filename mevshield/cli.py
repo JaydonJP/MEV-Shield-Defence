@@ -34,6 +34,8 @@ guardian_app = typer.Typer(help="Protocol-side mempool guardian.")
 app.add_typer(guardian_app, name="guardian")
 extensions_app = typer.Typer(help="Routing, cashback, batching, firewall, coordinated detection and replay.")
 app.add_typer(extensions_app, name="extensions")
+ml_app = typer.Typer(help="Auditable real-market ML collection, training and read-only assessment.")
+app.add_typer(ml_app, name="ml")
 
 console = Console()
 if sys.platform == "win32":
@@ -318,8 +320,13 @@ def guardian_start(respond: bool = typer.Option(True, help="auto-pause on CRITIC
 
 # ------------------------------------------------------------- train/benchmark
 @app.command()
-def train(samples: int = 20000):
-    """Train the ML risk predictor on synthesised attack scenarios and report its accuracy."""
+def train(samples: int = 20000, synthetic: bool = False, dataset: str | None = None):
+    """Train and promote the real-market model; --synthetic explicitly selects the legacy lab model."""
+    if not synthetic:
+        from .ml.pipeline import train_real
+        import json
+        console.print(json.dumps(train_real(dataset=dataset, publish=True, log=console.print), indent=2))
+        return
     from .defense import HarmPredictor
     console.print(f"synthesising {samples:,} attack scenarios and training gradient-boosted models…")
     m = HarmPredictor()
@@ -340,6 +347,34 @@ def train(samples: int = 20000):
     top = list(metrics.feature_importances.items())[:4]
     console.print("top features: " + ", ".join(f"{k} ({v:.2f})" for k, v in top))
     console.print(f"[green]saved to {config.MODEL_FILE}[/green]")
+
+
+@ml_app.command("collect")
+def ml_collect(blocks: int = 3000, end_block: int | None = None,
+               rpc: str = "https://eth.drpc.org", directory: str | None = None):
+    """Collect supported real Ethereum swaps, with cached resumable read-only requests."""
+    from .ml.mainnet import collect, DATA
+    collect(blocks=blocks, end_block=end_block, rpc=rpc, directory=directory or DATA, log=console.print)
+
+
+@ml_app.command("train")
+def ml_train(dataset: str | None = None, publish: bool = False, seed: int = 29, lab_samples: int = 6000):
+    """Train with chronological partitions. --publish requires the declared evaluation gates."""
+    import json
+    from .ml.pipeline import train_real
+    console.print(json.dumps(train_real(dataset, seed=seed, lab_samples=lab_samples,
+                                       publish=publish, log=console.print), indent=2))
+
+
+@ml_app.command("quote")
+def ml_quote(amount: float, slippage: float = .01,
+             pool: str = "0xb4e16d0168e52d35cacd2c6185b44281ec28c9dc"):
+    """Read live Ethereum reserves and assess a stablecoin-to-WETH what-if. Never signs."""
+    import json
+    from .ml.live import assess_mainnet
+    from .defense import HarmPredictor
+    model = HarmPredictor.load() if HarmPredictor.available() else None
+    console.print(json.dumps(assess_mainnet(pool, amount, slippage, model=model), indent=2))
 
 
 @app.command()

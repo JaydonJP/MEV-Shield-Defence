@@ -33,11 +33,9 @@ New at **`/safety`**:
 - **ML uncertainty:** disjoint training/calibration/test sets, nominal harm intervals, calibrated
   classifier scores, abstention and actual shadow-fork fallback. Failed fallback means unknown risk.
 
-Run `python scripts/verify_security.py` to create verification evidence. `mevshield start --build`
-trains a calibrated model when necessary. Model accuracy and interval coverage concern synthetic
-AMM scenarios, not historical/mainnet performance. A transaction preview is not a guarantee of
-future ordering or MEV protection. See [implementation notes](docs/SECURITY-UPGRADES.md),
-[validation](docs/VALIDATION.md), and [presentation/viva notes for all features](docs/PRESENTATION-NOTES.md).
+Run `python scripts/verify_security.py` to create verification evidence. A trained real-context model now ships with the project and loads in the local lab. At `/safety`, the **read-only Ethereum assessment** also reads four real V2 pools.
+
+The model uses **10,503 real mainnet swap inputs**, declared policy scenarios and separate synthetic lab augmentation. On its chronological counterfactual holdout: **99.91% balanced accuracy, 99.96% recall, $3.23 harm MAE**. These are **modeled economic-risk scores, not observed-attack detection accuracy**; the observed-size holdout has no positive cases. See [data, evaluation and limitations](docs/REAL-MARKET-ML.md), [implementation notes](docs/SECURITY-UPGRADES.md), [validation](docs/VALIDATION.md), and [presentation notes](docs/PRESENTATION-NOTES.md).
 
 ## Research extensions
 
@@ -97,7 +95,7 @@ All `mevshield …` commands below assume the venv is active (`.venv\Scripts\act
 mevshield start --build
 ```
 
-`start` boots the chain + shadow fork, deploys and seeds everything, trains the ML model if needed, then
+`start` boots the chain + shadow fork, deploys and seeds everything, loads the bundled ML model (or trains a legacy lab fallback if absent), then
 opens the **web dashboard** (`http://127.0.0.1:8000`). From that single page you drive the whole system and
 watch it react in real time. The main view explains each step with an animated transaction journey,
 actual token movements decoded from receipts, transaction ordering, a price chart that includes
@@ -194,7 +192,9 @@ mevshield guardian start                     # (2nd terminal) live mempool monit
 mevshield attack oracle --target safe        # TWAP lending: unprofitable by design
 mevshield attack governance --target safe    # snapshot voting defeats the flash-loan DAO takeover
 
-mevshield train                              # train the ML risk model; prints R² / CV / ROC-AUC / importances
+mevshield ml quote 10000                     # read-only real Ethereum pool assessment
+mevshield ml train --publish                 # real-context training; promotion requires held-out gates
+mevshield train --synthetic                  # explicit legacy synthetic lab training
 mevshield benchmark                          # mixed workload: detection P/R/FPR, harm with vs without shield
 mevshield demo                               # scripted terminal demo (backup for the live web demo)
 mevshield down                               # stop the devnet
@@ -226,7 +226,7 @@ mevshield down                               # stop the devnet
 - **Prevent (protocol side)** — `responder.py` sends `pause()` with a higher priority fee so it is ordered
   before the attack in the same block (Forta / Hypernative-style pre-execution defense). `SafeLending`
   additionally resists manipulation by design (TWAP + deviation guard).
-- **Fast predictor** — `predictor.py` trains a gradient-boosting model on a few thousand simulated
+- **Risk predictor** — the current pipeline in `mevshield/ml/` uses verified real pool inputs and declared policy cases (see the model card). The legacy `predictor.py` also supports simulated
   scenarios, predicting harm in a few milliseconds for the dashboard's live mempool labels (the simulator stays the
   source of truth for decisions).
 

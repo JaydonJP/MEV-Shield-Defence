@@ -1,0 +1,343 @@
+{
+  "schema": "market-risk-v1",
+  "label_kind": "counterfactual_v2_economics",
+  "promotion_gates": {
+    "balanced_accuracy_min": 0.9,
+    "recall_min": 0.95,
+    "harm_r2_min": 0.95,
+    "interval_coverage_min": 0.85
+  },
+  "source": "real Ethereum states and observed swaps, plus declared impact/slippage policies and synthetic lab augmentation",
+  "policy_trade_ratio_bands": [
+    [
+      1e-05,
+      0.001
+    ],
+    [
+      0.001,
+      0.003
+    ],
+    [
+      0.003,
+      0.01
+    ],
+    [
+      0.01,
+      0.05
+    ]
+  ],
+  "observed_input_rows": 10503,
+  "slippage_sources": {
+    "declared_policy_scenario": 10385,
+    "decoded_router_minimum": 118
+  },
+  "seed": 29,
+  "dataset_sha256": "efb25a1cbe7c766528c03a63c97f27e1c8263467c9301ce33049943db0387901",
+  "features": [
+    "log_trade",
+    "log_liquidity",
+    "slippage",
+    "fee_bps",
+    "log_gas_usd",
+    "log_eth_price",
+    "log_trade_ratio",
+    "trade_ratio",
+    "price_impact",
+    "slippage_value_over_gas",
+    "log_capital_ratio",
+    "gas_over_trade",
+    "slippage_over_fee"
+  ],
+  "excluded_features": [
+    "sender",
+    "pool identity",
+    "transaction hash",
+    "actual attack outcome",
+    "realized output"
+  ],
+  "partitions": {
+    "train": {
+      "n": 33760,
+      "first_block": 19474502,
+      "last_block": 26274409,
+      "observed_rows": 6752,
+      "id_sha256": "851c21ac55bc08863564f929dd455efb5b9048f7640a375d4132df7008f3a4ee"
+    },
+    "validation": {
+      "n": 7570,
+      "first_block": 26274427,
+      "last_block": 26283615,
+      "observed_rows": 1514,
+      "id_sha256": "03ff7acda33ba79cef44fc85e4afff791ccfeec7e5526d3314b60f5ba57630d7"
+    },
+    "calibration": {
+      "n": 4250,
+      "first_block": 26283619,
+      "last_block": 26290202,
+      "observed_rows": 850,
+      "id_sha256": "140c7ccef7caf21dbae6ad88d9b8cc973f817522a387f6de7e931589a2328d35"
+    },
+    "test": {
+      "n": 6920,
+      "first_block": 26290208,
+      "last_block": 26300292,
+      "observed_rows": 1384,
+      "id_sha256": "b5cf8b5211571e8f27727ae3f5e121e88f1f78d16f1572e4cda0b9e573b14640"
+    }
+  },
+  "lab_augmentation": {
+    "train": 4200,
+    "calibration": 900,
+    "test": 900
+  },
+  "candidates": [
+    {
+      "kind": "hist",
+      "target": "fraction",
+      "validation_log_mae": 0.018688827298292767
+    },
+    {
+      "kind": "extra",
+      "target": "fraction",
+      "validation_log_mae": 0.02128486183019452
+    },
+    {
+      "kind": "hist",
+      "target": "dollars",
+      "validation_log_mae": 0.025661261130022876
+    },
+    {
+      "kind": "extra",
+      "target": "dollars",
+      "validation_log_mae": 0.01937333559947933
+    }
+  ],
+  "selected_regressor": {
+    "kind": "hist",
+    "target": "fraction",
+    "validation_log_mae": 0.018688827298292767
+  },
+  "classifier": "extra",
+  "threshold": 0.475,
+  "evaluation_scope": "chronological held-out real contexts with observed and policy sizes; counterfactual labels, not observed attack incidence",
+  "test_evaluated": true,
+  "test": {
+    "n": 6920,
+    "accuracy": 0.9989884393063584,
+    "balanced_accuracy": 0.9991056908852437,
+    "precision": 0.9977670264235207,
+    "recall": 0.9996271439224459,
+    "f1": 0.9986962190352021,
+    "roc_auc": 0.9999967447676098,
+    "pr_auc": 0.9999948598681232,
+    "brier": 0.0007851511034747466,
+    "prevalence": 0.3875722543352601,
+    "majority_accuracy": 0.6124277456647399,
+    "confusion_matrix": [
+      [
+        4232,
+        6
+      ],
+      [
+        1,
+        2681
+      ]
+    ],
+    "harm_mae_usd": 3.2285893285429985,
+    "harm_rmse_usd": 29.36494441608487,
+    "harm_r2": 0.9998018241909166,
+    "p95_absolute_error_usd": 10.162826137118564,
+    "interval_coverage": 0.8914739884393064,
+    "interval_mean_width_usd": 7.548612099533835,
+    "block_bootstrap_95ci": {
+      "roc_auc": [
+        0.9999928031400213,
+        0.9999993705815474
+      ],
+      "recall": [
+        0.9988853399109113,
+        1.0
+      ],
+      "harm_mae_usd": [
+        2.448480934512196,
+        3.990179213036369
+      ]
+    }
+  },
+  "observed_trade_test": {
+    "n": 1384,
+    "accuracy": 1.0,
+    "balanced_accuracy": null,
+    "precision": null,
+    "recall": null,
+    "f1": null,
+    "roc_auc": null,
+    "pr_auc": null,
+    "brier": 7.59394691223373e-15,
+    "prevalence": 0.0,
+    "majority_accuracy": 1.0,
+    "confusion_matrix": [
+      [
+        1384,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ],
+    "harm_mae_usd": 0.00014834308860368084,
+    "harm_rmse_usd": 0.0018222260541222556,
+    "harm_r2": null,
+    "p95_absolute_error_usd": 0.00018885729663626415,
+    "positive_cases": 0,
+    "limitation": "No positive cases; observed-traffic recall, ROC-AUC and harm R\u00b2 are unidentifiable in this holdout."
+  },
+  "lab_test": {
+    "n": 900,
+    "accuracy": 0.9855555555555555,
+    "balanced_accuracy": 0.979100529100529,
+    "precision": 0.9885931558935361,
+    "recall": 0.9629629629629629,
+    "f1": 0.975609756097561,
+    "roc_auc": 0.999212228101117,
+    "pr_auc": 0.9982601125487279,
+    "brier": 0.01050373993113373,
+    "prevalence": 0.3,
+    "majority_accuracy": 0.7,
+    "confusion_matrix": [
+      [
+        627,
+        3
+      ],
+      [
+        10,
+        260
+      ]
+    ],
+    "harm_mae_usd": 14.435577361549056,
+    "harm_rmse_usd": 100.52388614776784,
+    "harm_r2": 0.9806787444015284,
+    "p95_absolute_error_usd": 33.9563132467091
+  },
+  "lab_qualified": true,
+  "promotion_passed": true,
+  "by_pool": {
+    "0x0d4a11d5eeaac28ec3f61d100daf4d40471f1852": {
+      "n": 2335,
+      "accuracy": 1.0,
+      "balanced_accuracy": 1.0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "roc_auc": 1.0,
+      "pr_auc": 1.0,
+      "brier": 3.9153689652426945e-05,
+      "prevalence": 0.39785867237687367,
+      "majority_accuracy": 0.6021413276231263,
+      "confusion_matrix": [
+        [
+          1406,
+          0
+        ],
+        [
+          0,
+          929
+        ]
+      ],
+      "harm_mae_usd": 3.624915136738605,
+      "harm_rmse_usd": 38.977726295315456,
+      "harm_r2": 0.9995905816151044,
+      "p95_absolute_error_usd": 9.635358781400411
+    },
+    "0x397ff1542f962076d0bfe58ea045ffa2d347aca0": {
+      "n": 1095,
+      "accuracy": 0.9981735159817352,
+      "balanced_accuracy": 0.99798738392995,
+      "precision": 0.9973753280839895,
+      "recall": 0.9973753280839895,
+      "f1": 0.9973753280839895,
+      "roc_auc": 0.9999669159002184,
+      "pr_auc": 0.9999375048955288,
+      "brier": 0.002466534607877444,
+      "prevalence": 0.34794520547945207,
+      "majority_accuracy": 0.6520547945205479,
+      "confusion_matrix": [
+        [
+          713,
+          1
+        ],
+        [
+          1,
+          380
+        ]
+      ],
+      "harm_mae_usd": 0.14743228027514,
+      "harm_rmse_usd": 0.5750437116403759,
+      "harm_r2": 0.9997244853579689,
+      "p95_absolute_error_usd": 0.6808706514523857
+    },
+    "0xa478c2975ab1ea89e8196811f51a7b7ade33eb11": {
+      "n": 835,
+      "accuracy": 0.9964071856287425,
+      "balanced_accuracy": 0.9970986460348162,
+      "precision": 0.9906542056074766,
+      "recall": 1.0,
+      "f1": 0.9953051643192489,
+      "roc_auc": 1.0,
+      "pr_auc": 1.0,
+      "brier": 0.0016013354197918757,
+      "prevalence": 0.38083832335329343,
+      "majority_accuracy": 0.6191616766467065,
+      "confusion_matrix": [
+        [
+          514,
+          3
+        ],
+        [
+          0,
+          318
+        ]
+      ],
+      "harm_mae_usd": 3.456626735844477,
+      "harm_rmse_usd": 19.233030887485114,
+      "harm_r2": 0.9997402395151387,
+      "p95_absolute_error_usd": 12.539196644508324
+    },
+    "0xb4e16d0168e52d35cacd2c6185b44281ec28c9dc": {
+      "n": 2655,
+      "accuracy": 0.9992467043314501,
+      "balanced_accuracy": 0.9993753903810119,
+      "precision": 0.9981060606060606,
+      "recall": 1.0,
+      "f1": 0.9990521327014218,
+      "roc_auc": 1.0,
+      "pr_auc": 1.0,
+      "brier": 0.0004910927681939026,
+      "prevalence": 0.3969868173258004,
+      "majority_accuracy": 0.6030131826741996,
+      "confusion_matrix": [
+        [
+          1599,
+          2
+        ],
+        [
+          0,
+          1054
+        ]
+      ],
+      "harm_mae_usd": 4.079073309944065,
+      "harm_rmse_usd": 28.19357205030205,
+      "harm_r2": 0.9998912979553889,
+      "p95_absolute_error_usd": 13.47200759083582
+    }
+  },
+  "shuffle_control_roc_auc": 0.521813180277585,
+  "latency": {
+    "ml_one_row_p50_ms": 8.043500001804205,
+    "exact_one_row_p50_ms": 0.9227500013366807
+  },
+  "artifact_sha256": "65c39df70009a93f2e89e718d06fbe3c537f17c81a22e76a3d99139f4a4554c2",
+  "sklearn_version": "1.9.1",
+  "artifact_encoding": "gzip pickle; trusted repository artifact only"
+}

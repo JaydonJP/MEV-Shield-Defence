@@ -167,10 +167,14 @@ def predictor_eval(chain: Chain, shadow: ShadowFork, n: int = 40, seed: int = 2,
         intent = SwapIntent(float(size))
         rep = eng.assess(intent, mode="sim", leakage_levels=False)
         t0 = time.perf_counter()
-        pred = model.predict(size, liq_usd, intent.slippage, config.POOL_FEE_BPS, 1.0)
+        from .ml.model import MarketRiskPredictor
+        options = {"eth_price_usd": r1 / r0, "domain": "lab"} if isinstance(model, MarketRiskPredictor) else {}
+        gas_gwei = (chain.base_fee() + intent.tip + config.GWEI) / config.GWEI
+        pred = model.predict(size, liq_usd, intent.slippage, config.POOL_FEE_BPS, gas_gwei, **options)
         pred_us = (time.perf_counter() - t0) * 1e6
         rows.append({"trade_usd": size, "sim_harm": rep.harm_public_usd, "ml_harm": pred["harm_usd"],
-                     "sim_ms": rep.sim_ms, "ml_us": pred_us, "p_attack": pred["p_attack"]})
+                     "sim_ms": rep.sim_ms, "ml_us": pred_us, "p_attack": pred["p_attack"],
+                     "ml_accepted":pred["accepted"],"ml_status":pred["status"]})
     df = pd.DataFrame(rows)
     mae = (df["sim_harm"] - df["ml_harm"]).abs().mean()
     ss_res = ((df["sim_harm"] - df["ml_harm"]) ** 2).sum()
@@ -178,7 +182,9 @@ def predictor_eval(chain: Chain, shadow: ShadowFork, n: int = 40, seed: int = 2,
     r2 = 1 - ss_res / ss_tot if ss_tot else 1.0
     metrics = {"mae": round(float(mae), 3), "r2": round(float(r2), 4),
                "mean_sim_ms": round(float(df["sim_ms"].mean()), 1), "mean_ml_us": round(float(df["ml_us"].mean()), 1),
-               "speedup": round(float(df["sim_ms"].mean() * 1000 / df["ml_us"].mean()), 0), "n": n}
+               "speedup": round(float(df["sim_ms"].mean() * 1000 / df["ml_us"].mean()), 0), "n": n,
+               "acceptance_rate":float(df.ml_accepted.mean()),
+               "scope":"Raw estimates vs local EVM; includes abstained estimates, not an execution guarantee"}
     store.save_experiment("predictor_eval", {"metrics": metrics, "model_metrics": model.metrics_dict(),
                                              "samples": df.to_dict("records")})
     log(f"  MAE=${metrics['mae']} R2={metrics['r2']} sim={metrics['mean_sim_ms']}ms ml={metrics['mean_ml_us']}us "

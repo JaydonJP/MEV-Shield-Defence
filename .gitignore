@@ -18,3 +18,8 @@ contracts/cache/
 contracts/broadcast/
 data/verification*
 data/pytest-*/
+data/mainnet/
+data/historical/
+data/pilot.pkl
+data/market-model.pkl
+build/

@@ -113,6 +113,13 @@ class RiskInput(BaseModel):
     slippage: float = Field(default=.02, gt=0, le=.2)
 
 
+class MainnetRiskInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    amount: float = Field(default=1000, gt=0, le=5_000_000)
+    slippage: float = Field(default=.01, gt=0, le=.2)
+    pool: str = Field(default="0xb4e16d0168e52d35cacd2c6185b44281ec28c9dc", pattern=r"^0x[a-fA-F0-9]{40}$")
+
+
 def create_app() -> FastAPI:
     bus = Broadcaster()
     engine = DemoEngine(emit=bus.emit)
@@ -281,6 +288,29 @@ def create_app() -> FastAPI:
     @app.post("/api/risk")
     async def risk_report(body: RiskInput):
         return await _run(engine.risk_preview, body.amount, body.slippage)
+
+    @app.get("/api/model")
+    async def model_evidence():
+        from ..defense import HarmPredictor
+        from ..ml.mainnet import POOLS
+        def read():
+            return {"available": HarmPredictor.available(), "pools": POOLS,
+                    "metrics": HarmPredictor.load().metrics_dict() if HarmPredictor.available() else None}
+        return await asyncio.to_thread(read)
+
+    @app.post("/api/mainnet/risk")
+    async def mainnet_risk(body: MainnetRiskInput):
+        from ..defense import HarmPredictor
+        from ..ml.live import assess_mainnet
+        def assess():
+            model = HarmPredictor.load() if HarmPredictor.available() else None
+            return assess_mainnet(body.pool, body.amount, body.slippage, model=model)
+        try:
+            return await asyncio.to_thread(assess)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        except Exception as exc:
+            raise HTTPException(503, "Mainnet read unavailable; no risk verdict was inferred") from exc
 
     @app.get("/api/verification")
     async def verification():
