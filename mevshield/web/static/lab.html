@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Research Lab · MEV Shield</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+  <link rel="stylesheet" href="/static/lab.css" />
+  <script src="/static/lab.js" defer></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="mark">MEV SHIELD</span><span class="tagline">Research lab</span></div>
+  <nav class="lab-nav"><span id="chain-state" class="muted">Checking devnet…</span><a href="/">Live dashboard ↗</a></nav>
+</header>
+<main class="lab-main">
+  <section class="lab-intro">
+    <div><span class="eyebrow">EXPERIMENT / MEASURE / COMPARE</span><h1>Explore the defense frontier.</h1>
+    <p>Run new settlement mechanisms on the local chain, or change the market conditions in a reproducible simulation.</p></div>
+    <button id="run-all" class="btn btn-accent">Run all in isolation</button>
+  </section>
+  <p id="notice" class="lab-notice" role="status" aria-live="polite">Individual chain demos change devnet state. The isolated suite restores the starting state after each experiment.</p>
+  <section class="feature-grid" aria-label="On-chain experiments">
+    <article class="feature-card" data-feature="routing">
+      <span class="feature-num">01 / ROUTING</span><h2>Choose the better route</h2>
+      <p>Allocate across both pools using output after modeled sandwich loss and gas. Execute with limits on every leg.</p>
+      <label>Trade size · USDC<input type="number" value="10000" min="1" max="100000" step="any" /></label>
+      <button class="btn feature-run">Route &amp; execute</button>
+    </article>
+    <article class="feature-card" data-feature="cashback">
+      <span class="feature-num">02 / CASHBACK</span><h2>Return value to the user</h2>
+      <p>Two funded searchers bid for a backrun. The winning bid settles the swap, arbitrage and user rebate atomically.</p>
+      <label>Trade size · USDC<input type="number" value="1000" min="1" max="100000" step="any" /></label>
+      <button class="btn feature-run">Run backrun auction</button>
+    </article>
+    <article class="feature-card" data-feature="batch">
+      <span class="feature-num">03 / MATCHING</span><h2>Match opposing orders</h2>
+      <p>Match Alice’s buy against Bob’s sell at one price. Settle the unmatched amount through the AMM.</p>
+      <label>Alice’s sell amount · USDC<input type="number" value="1000" min="1" max="100000" step="any" /></label>
+      <button class="btn feature-run">Settle two-order batch</button>
+    </article>
+    <article class="feature-card" data-feature="firewall">
+      <span class="feature-num">04 / FIREWALL</span><h2>Constrain protocol outflow</h2>
+      <p>Submit two borrows in one block. Shared on-chain budgets cap outflow across users and a rolling block window.</p>
+      <label>Each borrow · USDC<input type="number" value="8000" min="1" max="100000" step="any" /></label>
+      <button class="btn feature-run">Test outflow budgets</button>
+    </article>
+    <article class="feature-card" data-feature="coordinated">
+      <span class="feature-num">05 / SEQUENCES</span><h2>Connect related transactions</h2>
+      <p>Simulate a front-run and backrun from different accounts. Compare grouped execution with the victim alone.</p>
+      <label>Victim trade · USDC<input type="number" value="10000" min="1" max="100000" step="any" /></label>
+      <button class="btn feature-run">Analyze coordinated sequence</button>
+    </article>
+    <article class="feature-card feature-summary">
+      <span class="feature-num">LOCAL CHAIN / REAL EXECUTION</span><h2>Evidence you can inspect</h2>
+      <p>Settlement demos return transaction hashes and measured outcomes. Sequence detection runs on the shadow fork and drops its test transactions.</p>
+      <p>The suite restores snapshots; its recorded transactions will no longer be in the canonical chain.</p>
+      <a href="#replay-lab">Explore offline scenarios ↓</a>
+    </article>
+  </section>
+  <section id="feature-results" class="lab-results hidden" aria-live="polite"></section>
+  <section id="replay-lab" class="replay-panel">
+    <div class="replay-head"><div><span class="feature-num">06 / REPLAY</span><h2>Same market. Different defenses.</h2>
+      <p>Deterministic integer-AMM model · estimated gas · ideal private relay. This panel works without a devnet.</p></div>
+      <button id="export-result" class="btn btn-ghost" disabled>Export result</button>
+    </div>
+    <div class="replay-layout">
+      <form id="scenario-form" class="scenario-controls">
+        <label>Trade size · USDC<input name="amount_usdc" type="number" min="1" max="100000" step="any" value="10000" required /></label>
+        <label>Pool liquidity multiplier <output id="liquidity-out">1×</output><input name="liquidity_scale" type="range" min="0.05" max="20" step="0.05" value="1" /></label>
+        <label>Slippage tolerance <output id="slippage-out">2%</output><input name="slippage_pct" type="range" min="0.01" max="20" step="0.01" value="2" /></label>
+        <label>Attacker capital · USDC<input name="attacker_capital_usdc" type="number" min="0" max="5000000" step="any" value="50000" required /></label>
+        <label>Gas price · gwei<input name="gas_gwei" type="number" min="0.01" max="200" step="any" value="2" required /></label>
+        <label>Guardian delay · blocks<input name="guardian_delay_blocks" type="number" min="0" max="5" step="1" value="0" required /></label>
+        <label>Attacker priority fee · gwei<input name="attacker_tip_gwei" type="number" min="0" max="200" step="any" value="1" required /></label>
+        <label>Guardian priority fee · gwei<input name="guardian_tip_gwei" type="number" min="0" max="200" step="any" value="2" required /></label>
+        <label>Scenario seed<input name="seed" type="number" min="0" max="4294967295" step="1" value="42" required /></label>
+        <div class="lab-actions"><button class="btn btn-accent" type="submit">Compare defenses</button><button class="btn" type="button" id="save-replay">Save scenario</button></div>
+        <label>Saved scenarios<select id="saved-replays"><option value="">Choose a saved scenario</option></select></label>
+      </form>
+      <div id="replay-results" aria-live="polite"><p class="muted">Loading the initial comparison…</p></div>
+    </div>
+  </section>
+</main>
+<footer class="foot">Isolated local devnet · mock assets · experimental mechanisms · no mainnet transactions</footer>
+</body>
+</html>

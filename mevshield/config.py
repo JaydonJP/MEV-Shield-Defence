@@ -33,6 +33,9 @@ GWEI = 10**9
 
 def find_foundry_bin(name: str) -> str:
     """Locate a Foundry binary (anvil/forge) on PATH or in ~/.foundry/bin."""
+    portable = ROOT / ".tools" / "foundry" / (f"{name}.exe" if os.name == "nt" else name)
+    if portable.exists():
+        return str(portable)
     found = shutil.which(name)
     if found:
         return found

@@ -70,6 +70,8 @@ class Guardian(Searcher):
         self.log = log or (lambda *a, **k: None)
         self.seen: set[str] = set()
         self.verdicts: list[Verdict] = []
+        self.sequence_reports: list[dict] = []
+        self._sequence_seen: set[tuple] = set()
         self.responder = Responder(chain, log=self.log) if respond else None
 
     # ------------------------------------------------------- replay + features
@@ -216,6 +218,23 @@ class Guardian(Searcher):
             self.log(f"[guardian] {v.label} {v.tx_hash[:12]} ({v.sender_role or 'user'}): "
                      f"{'; '.join(v.reasons) or 'ordinary activity'}"
                      + (f"  → {action}" if action else ""))
+        if 3 <= len(pending) <= 32:
+            from ..extensions.coordinated import analyze_sequences
+            key = tuple(sorted(t["hash"] for t in pending))
+            if key not in self._sequence_seen:
+                self._sequence_seen.add(key)
+                try:
+                    report = analyze_sequences(chain, self.shadow, pending)
+                    self.sequence_reports.append(report)
+                    self.sequence_reports = self.sequence_reports[-100:]
+                    for finding in report["findings"]:
+                        self.log(f"[guardian sequence] {finding['label']}: grouped victim harm "
+                                 f"${finding['victim_harm_usd']:.2f}; different senders={finding['different_senders']}")
+                        store.add_alert(finding["hashes"][1], "sequence", finding["label"], "warning", .8,
+                                        finding, action="sequence detected; user-side protection required",
+                                        latency_ms=report["latency_ms"], block=chain.block_number)
+                except Exception as exc:
+                    self.log(f"[guardian sequence] analysis unavailable: {exc}")
         return responded
 
 

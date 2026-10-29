@@ -9,6 +9,7 @@ and are run in a worker thread by the server; `emit` hands each event to the ser
 from __future__ import annotations
 
 import time
+import threading
 from typing import Callable
 
 from .. import config, store
@@ -29,6 +30,7 @@ class DemoEngine:
         self.shadow: ShadowFork | None = None
         self.model: HarmPredictor | None = None
         self._busy = False
+        self._action_lock = threading.Lock()
 
     # ------------------------------------------------------------------ wiring
     def set_emitter(self, emit: Callable[[dict], None]) -> None:
@@ -326,14 +328,31 @@ class DemoEngine:
 
         class _Ctx:
             def __enter__(self_):
-                if not engine.connect():
-                    raise RuntimeError("devnet is not running")
+                if not engine._action_lock.acquire(blocking=False):
+                    raise RuntimeError("another devnet action is running")
+                try:
+                    if not engine.connect():
+                        raise RuntimeError("devnet is not running")
+                except Exception:
+                    engine._action_lock.release()
+                    raise
                 engine._busy = True
 
             def __exit__(self_, *a):
                 engine._busy = False
+                engine._action_lock.release()
 
         return _Ctx()
+
+    def run_extension(self, feature: str, amount: float | None = None) -> dict:
+        from ..extensions.service import run_feature, run_suite
+        with self._guard():
+            self.log(f"Running {feature} extension on the local devnet.")
+            result = (run_suite(self.chain, self.shadow) if feature == "all" else
+                      run_feature(self.chain, self.shadow, feature, amount))
+            self.emit("extension", feature=feature, result=result)
+            self.emit_status()
+            return result
 
 
 def _pool(c: Chain, key: str) -> dict:

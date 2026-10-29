@@ -1,4 +1,7 @@
 .venv/
+.tools/
+data/replays/
+data/extensions-results.json
 __pycache__/
 *.egg-info/
 *.pyc

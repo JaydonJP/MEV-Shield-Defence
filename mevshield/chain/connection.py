@@ -13,6 +13,10 @@ from .. import config
 
 # contract name -> forge artifact path (relative to contracts/out)
 ARTIFACTS = {
+    "MEVRouter": "MEVRouter.sol/MEVRouter.json",
+    "BatchSettlement": "BatchSettlement.sol/BatchSettlement.json",
+    "CashbackAuction": "CashbackAuction.sol/CashbackAuction.json",
+    "FirewallLending": "FirewallLending.sol/FirewallLending.json",
     "Token": "Token.sol/Token.json",
     "SimpleAMM": "SimpleAMM.sol/SimpleAMM.json",
     "FlashLender": "FlashLender.sol/FlashLender.json",
@@ -31,6 +35,8 @@ ARTIFACTS = {
 
 # deployment key -> contract type
 DEPLOYMENT_TYPES = {
+    "mevRouter": "MEVRouter", "batch": "BatchSettlement", "cashback": "CashbackAuction",
+    "firewall": "FirewallLending",
     "WETH": "Token", "USDC": "Token", "GOV": "Token",
     "ammA": "SimpleAMM", "ammB": "SimpleAMM",
     "lender": "FlashLender", "oracle": "TWAPOracle",

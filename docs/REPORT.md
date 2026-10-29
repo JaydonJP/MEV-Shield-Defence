@@ -2,6 +2,10 @@
 
 *Adaptive counterfactual defense against flash-loan and MEV attacks, demonstrated on a local Ethereum devnet.*
 
+> This document describes the original baseline implementation and its reported experiments.
+> The six subsequently implemented research extensions, current commands, scope, and validation
+> are documented in [EXTENSIONS.md](EXTENSIONS.md).
+
 ---
 
 ## 1. Problem

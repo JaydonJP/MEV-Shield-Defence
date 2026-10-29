@@ -52,6 +52,9 @@ abstract contract LendingBase {
     /// @dev Hook for extra borrow-time checks (SafeLending's deviation guard).
     function _beforeBorrow() internal view virtual {}
 
+    /// @dev Extension hook; accounting is reverted along with the borrow if the transfer fails.
+    function _afterBorrow(uint256) internal virtual {}
+
     // ------------------------------------------------------------------ views
 
     function collateralValue(address user) public view returns (uint256) {
@@ -83,6 +86,7 @@ abstract contract LendingBase {
         require(debtOf[msg.sender] + amount <= cap, "Lending: undercollateralised");
         debtOf[msg.sender] += amount;
         totalDebt += amount;
+        _afterBorrow(amount);
         require(debtToken.transfer(msg.sender, amount), "Lending: transfer");
         emit Borrow(msg.sender, amount, price);
     }
