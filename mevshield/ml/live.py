@@ -10,6 +10,32 @@ from .mainnet import DEFAULT_RPC, POOLS, TOKENS, ReadOnlyRPC, counterfactual
 from .model import MarketRiskPredictor
 
 
+def _assessment(inputs, model):
+    """Keep displayed economics consistent across the ML support boundary.
+
+    Regression output is advisory. In particular, a tiny positive ML residual
+    must not imply a profitable attack when modeled proceeds cannot pay gas.
+    """
+    exact = counterfactual(*inputs, attacker_gas=config.SANDWICH_GAS)
+    estimate = None
+    reasons = ["Headline harm uses explicit V2 economics; ML is shown separately as advisory evidence"]
+    if isinstance(model, MarketRiskPredictor):
+        try:
+            estimate = model.predict(*inputs, domain="mainnet")
+        except Exception:
+            reasons.append("ML inference unavailable; the V2 calculation is unaffected")
+    if not exact["attack"]:
+        reasons.append("No profitable completed sandwich found after attacker gas under these assumptions; this is not a safe-transaction verdict")
+    return {
+        "source": "exact-v2", "status": "calculated", "accepted": True,
+        "harm_usd": exact["harm_usd"], "p_attack": exact["attack"],
+        "p_profitable": exact["attack"], "interval_usd": None,
+        "nominal_coverage": None, "model_estimate": estimate,
+        "economics": {**exact, "net_profit_usd": exact["gross_profit_usd"] - exact["attacker_gas_usd"]},
+        "reasons": reasons,
+    }
+
+
 def assess_mainnet(pool, amount, slippage=0.01, rpc=DEFAULT_RPC, model=None):
     pool = pool.lower()
     if pool not in POOLS:
@@ -59,31 +85,18 @@ def assess_mainnet(pool, amount, slippage=0.01, rpc=DEFAULT_RPC, model=None):
     eth_price = liquidity / (eth_r / 10**18)
     gas = int(client.call("eth_gasPrice", []), 16) / 1e9
     inputs = (amount, liquidity, slippage, 30, gas, eth_price)
-    estimate = (
-        model.predict(*inputs, domain="mainnet")
-        if isinstance(model, MarketRiskPredictor)
-        else None
-    )
-    if estimate and estimate["accepted"]:
-        result = estimate
-    else:
-        exact = counterfactual(*inputs, attacker_gas=config.SANDWICH_GAS)
-        result = {
-            "source": "exact-v2",
-            "status": "calculated",
-            "accepted": True,
-            "harm_usd": exact["harm_usd"],
-            "p_attack": exact["attack"],
-            "p_profitable": exact["attack"],
-            "interval_usd": None,
-            "nominal_coverage": None,
-            "model_estimate": estimate,
-            "reasons": [
-                "Used explicit V2 economics because no accepted real-market ML estimate was available"
-            ],
-        }
+    result = _assessment(inputs, model)
+    # One reserve/block read and one gas quote for every comparison row. Separate
+    # live requests can see different markets and are not a controlled comparison.
+    comparison = []
+    for tolerance in sorted({slippage, .04, .10}):
+        row = result if tolerance == slippage else _assessment(
+            (amount, liquidity, tolerance, 30, gas, eth_price), model)
+        comparison.append({"slippage": tolerance, **row})
     return {
         **result,
+        "comparison": comparison,
+        "comparison_scope": "same block reserves, trade, gas quote, ETH price and attacker assumptions; only slippage changes",
         "chain_id": 1,
         "block": int(tag, 16),
         "block_hash": block["hash"],

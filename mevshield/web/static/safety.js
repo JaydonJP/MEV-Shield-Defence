@@ -2,6 +2,7 @@
 const q = s => document.querySelector(s);
 const node = (tag, text, cls) => { const el = document.createElement(tag); if (text != null) el.textContent = text; if (cls) el.className = cls; return el; };
 let current = null, busy = false, generation = 0;
+const money = v => v > 0 && v < .01 ? "<$0.01" : `$${v.toFixed(2)}`;
 async function api(path, body) {
   const response = await fetch(path, body === undefined ? {} : {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
   const data = await response.json();
@@ -10,7 +11,7 @@ async function api(path, body) {
 }
 function notice(text, error = false) { q("#notice").textContent = text; q("#notice").classList.toggle("error", error); }
 function evidence(parent, value) { const d = node("details"); d.append(node("summary", "Inspect or copy the full evidence"), node("pre", JSON.stringify(value, null, 2))); parent.append(d); }
-function table(parent, headings, rows) { const t = node("table"), head = node("tr"); headings.forEach(h => head.append(node("th", h))); t.append(head); for (const row of rows) { const tr = node("tr"); row.forEach(v => tr.append(node("td", v))); t.append(tr); } parent.append(t); }
+function table(parent, headings, rows) { const wrap = node("div", null, "safety-table-wrap"), t = node("table"), head = node("tr"); headings.forEach(h => head.append(node("th", h))); t.append(head); for (const row of rows) { const tr = node("tr"); row.forEach(v => tr.append(node("td", v))); t.append(tr); } wrap.append(t); parent.append(wrap); }
 function tokens(raw) { const value = BigInt(raw), negative = value < 0n, abs = negative ? -value : value; return (negative ? "−" : "+") + (abs / 10n ** 18n).toString() + "." + (abs % 10n ** 18n).toString().padStart(18, "0").slice(0, 6); }
 function report(r) {
   const parent = q("#report"); parent.replaceChildren(node("h2", r.status === "blocked" ? "Contract policy blocked this action" : "Transaction report"));
@@ -25,7 +26,7 @@ function report(r) {
   if (r.receipt) { parent.append(node("p", `Receipt: ${r.receipt.hash}`), node("p", r.receipt.reconciliation.matches ? "Observed changes match the preview. Gas paid is recorded separately." : "Observed changes differ from the preview; inspect reconciliation evidence.")); }
   if (r.status === "previewed") {
     const button = node("button", "Execute this exact local transaction", "button primary"); button.id = "execute-preview";
-    button.addEventListener("click", async () => { if (busy || current?.id !== r.id) return; busy = true; button.disabled = true; notice("Submitting the reviewed local transaction…"); try { const result = await api("/api/safety/execute", {report_id:r.id,binding:r.binding}); current = null; report(result); notice("Transaction included. Review its actual changes below."); await history(); } catch(e) { current = null; notice(e.message, true); } finally { busy = false; } });
+    button.addEventListener("click", async () => { if (busy || current?.id !== r.id) return; busy = true; button.disabled = true; notice("Submitting the reviewed local transaction…"); try { const result = await api("/api/safety/execute", {report_id:r.id,binding:r.binding}); current = null; report(result); notice(result.status === "included" ? "Transaction included. Review its actual changes below." : "Transaction reverted. Review the receipt below.", result.status !== "included"); await history(); } catch(e) { current = null; notice(e.message, true); } finally { busy = false; } });
     parent.append(button, node("p", "This preview expires in two minutes. New chain activity requires another simulation."));
   }
   evidence(parent, r);
@@ -39,9 +40,14 @@ q("#preview-form").addEventListener("submit", async e => {
   notice("Simulating on the shadow fork. No main-chain transaction is submitted during preview.");
   try { const result=await api("/api/safety/preview",body); if (request !== generation) { notice("Inputs changed while simulating; create a new preview."); return; } current=result; report(result); notice(result.simulation_passed ? "Preview ready. Review the changes and warnings before executing." : "The contract rejected this action in simulation.", !result.simulation_passed); await history(); } catch(e) {notice(e.message,true);} finally {busy=false;button.disabled=false;}
 });
+let riskGeneration = 0;
+q("#risk-form").addEventListener("input", () => {
+  riskGeneration++;
+  q("#risk-result").replaceChildren(node("p", "Inputs changed. Assess risk again to update the result."));
+});
 q("#risk-form").addEventListener("submit",async e=>{
-  e.preventDefault(); const button=e.currentTarget.querySelector("button"); button.disabled=true; const data=Object.fromEntries(new FormData(e.currentTarget));
-  try { const result=await api("/api/risk",{amount:Number(data.amount),slippage:Number(data.slippage)/100}); const parent=q("#risk-result"); parent.replaceChildren(node("h3",`${result.status} · ${result.source}`)); parent.append(node("p", result.harm_usd == null ? "Risk is unknown. No safe verdict is inferred." : `Estimated sandwich harm: $${result.harm_usd.toFixed(2)}.`)); if(result.interval_usd) parent.append(node("p",`90% nominal calibration interval: $${result.interval_usd[0].toFixed(2)} – $${result.interval_usd[1].toFixed(2)}. Coverage can fail under drift.`)); for(const reason of result.reasons || []) parent.append(node("p",reason)); evidence(parent,result); } catch(e){notice(e.message,true);} finally{button.disabled=false;}
+  e.preventDefault(); const button=e.currentTarget.querySelector("button"); button.disabled=true; const data=Object.fromEntries(new FormData(e.currentTarget)), request=++riskGeneration;
+  try { const result=await api("/api/risk",{amount:Number(data.amount),slippage:Number(data.slippage)/100}); if(request !== riskGeneration) return; const parent=q("#risk-result"); parent.replaceChildren(node("h3",`${result.status} · ${result.source}`)); parent.append(node("p", result.harm_usd == null ? "Risk is unknown. No safe verdict is inferred." : `Estimated sandwich harm: ${money(result.harm_usd)}.`)); if(result.interval_usd) parent.append(node("p",`90% nominal calibration interval: $${result.interval_usd[0].toFixed(2)} – $${result.interval_usd[1].toFixed(2)}. Coverage can fail under drift.`)); for(const reason of result.reasons || []) parent.append(node("p",reason)); evidence(parent,result); } catch(e){if(request === riskGeneration)notice(e.message,true);} finally{button.disabled=false;}
 });
 async function history(){const rows=await api("/api/safety/history"),parent=q("#history");parent.replaceChildren();if(!rows.length)parent.append(node("p","No previews recorded yet."));else table(parent,["Action","User","State","Receipt"],rows.map(r=>[r.action,r.role,r.status,r.receipt?.hash || "—"]));}
 async function verification(){const result=await api("/api/verification"),parent=q("#verification-result");parent.replaceChildren(node("p",result.status === "passed" ? "Verification passed. Inspect the recorded commands, seed and mutation results." : result.message || `Recorded verification status: ${result.status}`));evidence(parent,result);}
@@ -57,10 +63,33 @@ api("/api/model").then(data=>{
   else parent.append(node("p","Real-market model not available. Mainnet assessment uses explicit V2 calculation."));
   evidence(parent,data.metrics);
 }).catch(e=>q("#model-evidence").append(node("p",e.message)));
+let mainnetGeneration = 0;
+q("#mainnet-form").addEventListener("input", () => {
+  mainnetGeneration++;
+  q("#mainnet-result").replaceChildren(node("p", "Inputs changed. Read the pool again to update the comparison."));
+});
 q("#mainnet-form").addEventListener("submit",async e=>{
   e.preventDefault();const button=e.currentTarget.querySelector("button"),parent=q("#mainnet-result"),data=Object.fromEntries(new FormData(e.currentTarget));button.disabled=true;parent.replaceChildren(node("p","Reading Ethereum reserves…"));
-  try{const r=await api("/api/mainnet/risk",{pool:data.pool,amount:Number(data.amount),slippage:Number(data.slippage)/100});parent.replaceChildren(node("h3",`${r.status} · ${r.source}`));parent.append(node("p",`Conditional sandwich harm: $${r.harm_usd.toFixed(2)} · block ${r.block.toLocaleString()}.`),node("p",`Reference ETH price: $${r.inputs.eth_price_usd.toFixed(2)} from pool spot. Assumes $5m attacker capital, 420,000 attacker gas units and stablecoins at $1. Private order flow, builder competition and subsequent price moves are not modeled.`));if(r.interval_usd)parent.append(node("p",`90% nominal harm interval: $${r.interval_usd[0].toFixed(2)} – $${r.interval_usd[1].toFixed(2)}. Coverage can change with market conditions.`));for(const reason of r.reasons||[])parent.append(node("p",reason));evidence(parent,r);}
-  catch(e){parent.replaceChildren(node("p",e.message));}finally{button.disabled=false;}
+  const request = ++mainnetGeneration;
+  try{
+    const r=await api("/api/mainnet/risk",{pool:data.pool,amount:Number(data.amount),slippage:Number(data.slippage)/100});
+    if (request !== mainnetGeneration) return;
+    parent.replaceChildren(node("h3",`${r.status} · ${r.source}`));
+    parent.append(node("p",`Modeled sandwich harm: ${money(r.harm_usd)} at ${Number((r.inputs.slippage*100).toFixed(3))}% slippage · ${r.pool_name} · block ${r.block.toLocaleString()}.`));
+    table(parent,["Slippage", "Modeled harm", "Attacker profit before gas", "Attacker gas", "Profitable after gas?"],r.comparison.map(row=>[
+      `${Number((row.slippage*100).toFixed(3))}%${row.slippage === r.inputs.slippage ? " (selected)" : ""}`,
+      money(row.harm_usd),money(row.economics.gross_profit_usd),money(row.economics.attacker_gas_usd),row.p_profitable ? "Yes, in model" : "No"
+    ]));
+    parent.append(node("p",`All rows share reserves at block ${r.block.toLocaleString()}, gas ${r.inputs.gas_price_gwei.toFixed(3)} gwei and ETH price $${r.inputs.eth_price_usd.toFixed(2)} from pool spot. Assumes $5m attacker capital, ${r.assumptions.attacker_gas_units.toLocaleString()} attacker gas units and stablecoins at $1. Private order flow, builder competition and subsequent price moves are not modeled. A new assessment refreshes the snapshot.`));
+    for(const reason of r.reasons||[])parent.append(node("p",reason));
+    const ml = r.model_estimate;
+    if (ml?.accepted && ml.harm_usd != null) {
+      parent.append(node("p",`Advisory ML harm for the selected tolerance: ${money(ml.harm_usd)}. Regression residuals can be positive even when the economic calculation finds no profitable attack.`));
+      if(ml.interval_usd)parent.append(node("p",`ML-only 90% nominal interval: ${money(ml.interval_usd[0])} – ${money(ml.interval_usd[1])}. Coverage can change with market conditions.`));
+    } else parent.append(node("p","ML abstained or is unavailable for this input. The economic calculation above still applies."));
+    evidence(parent,r);
+  }
+  catch(e){if(request === mainnetGeneration)parent.replaceChildren(node("p",e.message));}finally{button.disabled=false;}
 });
 
 async function hybridEvidence(){

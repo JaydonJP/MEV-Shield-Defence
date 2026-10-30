@@ -34,7 +34,7 @@
   </section>
   <section class="safety-panel" id="mainnet-panel">
     <p class="eyebrow">ETHEREUM · READ ONLY</p><h2>Assess a real pool</h2>
-    <p>Estimate sandwich economics for a stablecoin → WETH swap using current V2 reserves. This measures vulnerability under declared assumptions; it does not predict whether an attacker will appear. An uncertain ML estimate falls back to explicit V2 calculation.</p>
+    <p>Calculate sandwich economics for a stablecoin → WETH swap using current V2 reserves. Compare your tolerance with 4% and 10% using the same block, gas quote and ETH price. Headline harm always uses explicit V2 economics; ML estimates are separate advisory evidence. This does not predict whether an attacker will appear.</p>
     <form id="mainnet-form" class="inline-form"><label>Pool<select name="pool" id="mainnet-pool"></select></label><label>Stablecoin amount<input name="amount" type="number" min="1" max="5000000" value="10000" required></label><label>Slippage %<input name="slippage" type="number" min="0.001" max="20" step="any" value="1" required></label><button class="button" type="submit">Read pool and assess</button></form>
     <div id="mainnet-result" aria-live="polite"></div>
     <details><summary>Training data and held-out evaluation</summary><div id="model-evidence"></div></details>

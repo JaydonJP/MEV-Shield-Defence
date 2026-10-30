@@ -5,7 +5,13 @@ const fmt = (v, digits = 2) => Number(v).toLocaleString("en-US", { maximumFracti
 const usd = (v) => "$" + fmt(v);
 let lastReplay = null;
 let chainBusy = false;
+let chainReady = false;
+let serverBusy = false;
 let requestSequence = 0;
+
+function updateChainButtons() {
+  document.querySelectorAll(".feature-run,#run-all").forEach(b => b.disabled = chainBusy || serverBusy || !chainReady);
+}
 
 async function api(path, body) {
   const response = await fetch(path, body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -59,18 +65,26 @@ function renderFeature(name, r, parent) {
   evidence(section, r); parent.append(section);
 }
 async function runFeature(feature, amount) {
-  if(chainBusy) return;
+  if(chainBusy || serverBusy || !chainReady) return;
   chainBusy = true;
-  document.querySelectorAll(".feature-run,#run-all").forEach(b => b.disabled = true);
+  updateChainButtons();
+  const replayRequest = feature === "all" ? ++requestSequence : null;
+  const parent = q("#feature-results"); parent.replaceChildren(node("p", "Running the requested experiment…")); parent.classList.remove("hidden");
   notice("Running " + feature + ". The chain and shadow fork may take a few seconds.");
   try {
     const result = await api("/api/extensions/" + feature, amount === undefined ? {} : {amount});
-    const parent = q("#feature-results"); parent.replaceChildren(); parent.classList.remove("hidden");
-    if(feature === "all") Object.entries(result.results).filter(([name]) => name !== "replay").forEach(([name,r]) => renderFeature(name,r,parent));
+    parent.replaceChildren();
+    if(feature === "all") {
+      Object.entries(result.results).filter(([name]) => name !== "replay").forEach(([name,r]) => renderFeature(name,r,parent));
+      if (replayRequest === requestSequence && result.results.replay) {
+        applyScenario(result.results.replay.scenario);
+        renderReplay(result.results.replay);
+      }
+    }
     else renderFeature(feature,result,parent);
     notice(feature === "all" ? "Suite complete. Every experiment restored its starting chain state." : "Experiment complete. Evidence is shown below.");
-  } catch(e) { notice(e.message, true); }
-  finally { chainBusy = false; document.querySelectorAll(".feature-run,#run-all").forEach(b => b.disabled = false); }
+  } catch(e) { parent.replaceChildren(node("p",e.message)); notice(e.message, true); }
+  finally { chainBusy = false; await status(); }
 }
 document.querySelectorAll(".feature-run").forEach(button => button.addEventListener("click", () => {
   const card = button.closest(".feature-card"), input = card.querySelector("input");
@@ -84,25 +98,44 @@ function scenario() {
   s.slippage = s.slippage_pct / 100; delete s.slippage_pct; return s;
 }
 function syncRanges() { q("#liquidity-out").textContent = q('[name="liquidity_scale"]').value + "×"; q("#slippage-out").textContent = q('[name="slippage_pct"]').value + "%"; }
-q("#scenario-form").addEventListener("input", syncRanges);
+function invalidateReplay() {
+  requestSequence++;
+  lastReplay = null;
+  q("#export-result").disabled = true;
+  q("#saved-replays").value = "";
+  q("#replay-results").replaceChildren(node("p", "Scenario changed. Compare defenses to update the results."));
+  syncRanges();
+}
+q("#scenario-form").addEventListener("input", event => { if(event.target.id !== "saved-replays") invalidateReplay(); });
+function applyScenario(s) {
+  Object.entries(s).forEach(([key,value]) => { const input = q('[name="' + (key === "slippage" ? "slippage_pct" : key) + '"]'); if(input) input.value = key === "slippage" ? value*100 : value; });
+  syncRanges();
+}
 function renderReplay(r) {
   lastReplay = r; q("#export-result").disabled = false;
   const parent = q("#replay-results"); parent.replaceChildren();
   metrics(parent, [["Best completed strategy", r.best_completed], ["Modeled price move", fmt(r.seeded_price_move * 100, 3) + "%"], ["Guardian can precede", r.guardian.can_precede_attack ? "Yes, under assumptions" : "No"]]);
-  parent.querySelectorAll(".lab-metric strong").forEach(el => el.style.fontSize = "17px");
+  parent.classList.add("replay-metrics");
   parent.append(node("p", "Modeled MEV loss · lower is better", "lab-scope"));
   const maxLoss = Math.max(1, ...r.rows.map(x => x.mev_loss_usd));
-  r.rows.forEach(row => { const bar = node("div", null, "bar-row" + (row.strategy === r.best_completed ? " best" : "")); const track = node("div", null, "bar-track"), fill = node("div", null, "bar-fill"); fill.style.width = Math.max(0, row.mev_loss_usd/maxLoss*100) + "%"; track.append(fill); bar.append(node("span", row.strategy), track, node("span", usd(row.mev_loss_usd))); parent.append(bar); });
+  r.rows.forEach(row => {
+    const bar = node("div", null, "bar-row" + (row.strategy === r.best_completed ? " best" : ""));
+    const track = node("progress", null, "bar-track"); track.max = maxLoss; track.value = Math.max(0, row.mev_loss_usd); track.setAttribute("aria-label", row.strategy + " modeled loss in USD");
+    bar.append(node("span", row.strategy + (row.completed ? "" : " (failed)")), track, node("span", row.completed ? usd(row.mev_loss_usd) : "Failed swap")); parent.append(bar);
+  });
   table(parent, ["Strategy", "Completed", "WETH received", "MEV loss", "Gas + fee", "Comparison cost*"], r.rows.map(x => [x.strategy, x.completed ? "Yes" : "No", fmt(x.received_weth,7), usd(x.mev_loss_usd), usd(x.gas_usd+x.fee_usd), usd(x.comparison_cost_usd)]), r.rows.findIndex(x => x.strategy === r.best_completed));
   parent.append(node("p", "*Comparison cost uses a common initial quote, gas and fees, plus a retry penalty for failed swaps. Price improvements can make it negative. Failed swaps are excluded from the winner. The router requotes at inclusion; other strategies retain the initial quote.", "lab-scope"));
   parent.append(node("p", r.scope + ". Guardian ordering is a separate model check, not an executed pause transaction.", "lab-scope"));
   evidence(parent, r);
 }
-q("#scenario-form").addEventListener("submit", async event => {
-  event.preventDefault(); const sequence = ++requestSequence;
+async function compareReplay() {
+  const sequence = ++requestSequence;
+  lastReplay = null; q("#export-result").disabled = true;
+  q("#replay-results").replaceChildren(node("p", "Calculating this scenario…"));
   try { const result = await api("/api/replay", scenario()); if(sequence === requestSequence) renderReplay(result); }
-  catch(e) { notice(e.message,true); }
-});
+  catch(e) { if(sequence === requestSequence) { q("#replay-results").replaceChildren(node("p",e.message)); notice(e.message,true); } }
+}
+q("#scenario-form").addEventListener("submit", event => { event.preventDefault(); compareReplay(); });
 async function refreshSaved(selected = "") {
   const saved = await api("/api/replays"), select = q("#saved-replays");
   select.replaceChildren(node("option", "Choose a saved scenario")); select.firstChild.value = "";
@@ -114,17 +147,28 @@ q("#save-replay").addEventListener("click", async () => {
   catch(e) { notice(e.message,true); }
 });
 q("#saved-replays").addEventListener("change", async event => {
-  if(!event.target.value) return;
   const sequence = ++requestSequence;
+  if(!event.target.value) { invalidateReplay(); return; }
+  lastReplay = null; q("#export-result").disabled = true;
+  q("#replay-results").replaceChildren(node("p", "Loading the saved scenario…"));
   try { const result = await api("/api/replays/" + event.target.value); if(sequence !== requestSequence) return;
-    Object.entries(result.scenario).forEach(([key,value]) => { const input = q('[name="' + (key === "slippage" ? "slippage_pct" : key) + '"]'); if(input) input.value = key === "slippage" ? value*100 : value; }); syncRanges(); renderReplay(result);
-  } catch(e) { notice(e.message,true); }
+    applyScenario(result.scenario); renderReplay(result);
+  } catch(e) { if(sequence === requestSequence) { q("#replay-results").replaceChildren(node("p",e.message)); notice(e.message,true); } }
 });
 q("#export-result").addEventListener("click", () => {
   if(!lastReplay) return; const url = URL.createObjectURL(new Blob([JSON.stringify(lastReplay,null,2)],{type:"application/json"}));
   const a = node("a"); a.href = url; a.download = "mev-shield-replay.json"; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
-async function status() { try { const s = await api("/api/status"); q("#chain-state").textContent = s.ready ? "● Devnet connected · block " + s.block : "○ Devnet offline · replay available"; } catch { q("#chain-state").textContent = "Connection unavailable"; } }
+async function status() {
+  try {
+    const s = await api("/api/status");
+    serverBusy = Boolean(s.busy);
+    if (!serverBusy) chainReady = Boolean(s.ready);
+    q("#chain-state").textContent = serverBusy ? "● Devnet busy · replay available" : chainReady ? "● Devnet connected · block " + s.block : "○ Devnet offline · replay available";
+  } catch { chainReady = false; serverBusy = false; q("#chain-state").textContent = "Connection unavailable · replay needs the server"; }
+  updateChainButtons();
+}
+updateChainButtons();
 status(); setInterval(status,10000);
 refreshSaved().catch(e => notice(e.message,true));
-api("/api/replay", scenario()).then(renderReplay).catch(e => notice(e.message,true));
+compareReplay();
