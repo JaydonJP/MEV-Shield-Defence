@@ -17,8 +17,12 @@
   <section class="lab-intro">
     <div><span class="eyebrow">EXPERIMENT / MEASURE / COMPARE</span><h1>Explore the defense frontier.</h1>
     <p>Run new settlement mechanisms on the local chain, or change the market conditions in a reproducible simulation.</p></div>
-    <button id="run-all" class="btn btn-accent">Run all in isolation</button>
+    <div class="lab-actions">
+      <button id="reset-lab" class="btn" type="button">Reset lab</button>
+      <button id="run-all" class="btn btn-accent" type="button">Run all in isolation</button>
+    </div>
   </section>
+  <p class="lab-scope">Reset lab restores the shared local blockchain and default inputs. Saved replay scenarios stay available.</p>
   <p id="notice" class="lab-notice" role="status" aria-live="polite">Individual chain demos change devnet state. The isolated suite restores the starting state after each experiment.</p>
   <section class="feature-grid" aria-label="On-chain experiments">
     <article class="feature-card" data-feature="routing">

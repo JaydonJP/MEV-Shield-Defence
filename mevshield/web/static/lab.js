@@ -10,7 +10,7 @@ let serverBusy = false;
 let requestSequence = 0;
 
 function updateChainButtons() {
-  document.querySelectorAll(".feature-run,#run-all").forEach(b => b.disabled = chainBusy || serverBusy || !chainReady);
+  document.querySelectorAll(".feature-run,#run-all,#reset-lab").forEach(b => b.disabled = chainBusy || serverBusy || !chainReady);
 }
 
 async function api(path, body) {
@@ -91,6 +91,23 @@ document.querySelectorAll(".feature-run").forEach(button => button.addEventListe
   if (input.reportValidity()) runFeature(card.dataset.feature, Number(input.value));
 }));
 q("#run-all").addEventListener("click", () => runFeature("all"));
+q("#reset-lab").addEventListener("click", async () => {
+  if (chainBusy || serverBusy || !chainReady) return;
+  chainBusy = true;
+  updateChainButtons();
+  const button = q("#reset-lab"); button.textContent = "Resetting…";
+  notice("Restoring the local blockchain to its clean deployed state…");
+  try {
+    await api("/api/reset", {});
+    const results = q("#feature-results"); results.replaceChildren(); results.classList.add("hidden");
+    document.querySelectorAll(".feature-card input").forEach(input => input.value = input.defaultValue);
+    q("#scenario-form").reset();
+    invalidateReplay();
+    await compareReplay();
+    notice("Lab reset. The local blockchain and default inputs are restored; saved scenarios are retained.");
+  } catch (e) { notice("Lab reset failed: " + e.message, true); }
+  finally { button.textContent = "Reset lab"; chainBusy = false; await status(); }
+});
 
 function scenario() {
   const data = Object.fromEntries(new FormData(q("#scenario-form")));
